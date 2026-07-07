@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: qr
+      POSTGRES_PASSWORD: qr_password # à changer en production
+      POSTGRES_DB: qrplatform
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qr -d qrplatform"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://qr:qr_password@db:5432/qrplatform
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changez-moi}
+      SESSION_SECRET: ${SESSION_SECRET:-changez-moi-64-caracteres-aleatoires}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      RETENTION_DAYS: ${RETENTION_DAYS:-}
+
+volumes:
+  pgdata:

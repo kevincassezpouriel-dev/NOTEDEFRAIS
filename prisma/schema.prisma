@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Un QR code = une campagne (Flyer Paris, Salon, Instagram…).
+/// Les URLs de destination sont modifiables sans changer le QR code :
+/// le QR pointe toujours vers /r/{slug}.
+model QrCode {
+  id           String       @id @default(cuid())
+  name         String
+  slug         String       @unique
+  appStoreUrl  String
+  playStoreUrl String
+  fallbackUrl  String
+  logo         String? // logo au centre du QR, stocké en data-URL (max ~200 Ko)
+  active       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  scans        ScanEvent[]
+  conversions  Conversion[]
+}
+
+/// Un scan = un passage par /r/{slug}. IP anonymisée avant stockage (RGPD).
+model ScanEvent {
+  id           String   @id @default(cuid())
+  qrCode       QrCode   @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+  qrCodeId     String
+  createdAt    DateTime @default(now())
+  ipAnonymized String? // IPv4 : dernier octet à 0 — IPv6 : tronquée à /48
+  country      String?
+  countryCode  String?
+  city         String?
+  latitude     Float? // arrondi à 1 décimale (~11 km) : niveau ville, pas individu
+  longitude    Float?
+  deviceType   String // iphone | ipad | android | windows | mac | linux | other
+  os           String?
+  browser      String?
+  language     String?
+  referrer     String?
+  redirectedTo String // appstore | playstore | fallback
+
+  @@index([qrCodeId, createdAt])
+  @@index([createdAt])
+}
+
+/// Conversion post-installation : l'app mobile appelle /api/convert au premier
+/// lancement (voir README, section « Suivi des conversions »).
+model Conversion {
+  id        String   @id @default(cuid())
+  qrCode    QrCode   @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+  qrCodeId  String
+  createdAt DateTime @default(now())
+  platform  String? // ios | android
+
+  @@index([qrCodeId, createdAt])
+}
