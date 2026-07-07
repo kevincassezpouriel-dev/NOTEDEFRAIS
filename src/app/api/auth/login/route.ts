@@ -5,13 +5,9 @@ import { SESSION_COOKIE, SESSION_MAX_AGE, createSessionToken } from "@/lib/auth"
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const expected = process.env.ADMIN_PASSWORD;
-  if (!expected) {
-    return NextResponse.json(
-      { error: "ADMIN_PASSWORD n'est pas configuré sur le serveur" },
-      { status: 500 }
-    );
-  }
+  // La variable d'environnement ADMIN_PASSWORD, si définie, remplace le
+  // mot de passe par défaut ci-dessous.
+  const expected = process.env.ADMIN_PASSWORD || "ACKMINGGLE";
 
   let password = "";
   try {
