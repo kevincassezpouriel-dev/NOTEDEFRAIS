@@ -1,5 +1,5 @@
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const RESERVED_SLUGS = new Set(["admin", "api", "app", "privacy", "r"]);
+const RESERVED_SLUGS = new Set(["admin", "api", "app", "privacy", "r", "l", "news"]);
 const MAX_LOGO_BYTES = 300 * 1024;
 
 export function validateSlug(slug: string): string | null {

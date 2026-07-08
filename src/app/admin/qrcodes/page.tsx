@@ -7,6 +7,8 @@ interface QrRow {
   id: string;
   name: string;
   slug: string;
+  type: string;
+  channel: string | null;
   active: boolean;
   createdAt: string;
   totalScans: number;
@@ -17,6 +19,8 @@ export default function QrCodesPage() {
   const [qrcodes, setQrcodes] = useState<QrRow[]>([]);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [type, setType] = useState<"qr" | "link">("qr");
+  const [channel, setChannel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -36,12 +40,18 @@ export default function QrCodesPage() {
     const res = await fetch("/api/admin/qrcodes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, slug: slug || undefined }),
+      body: JSON.stringify({
+        name,
+        slug: slug || undefined,
+        type,
+        channel: channel || undefined,
+      }),
     });
     setCreating(false);
     if (res.ok) {
       setName("");
       setSlug("");
+      setChannel("");
       load();
     } else {
       const data = await res.json().catch(() => null);
@@ -51,9 +61,23 @@ export default function QrCodesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">QR codes / campagnes</h1>
+      <h1 className="text-xl font-semibold">Campagnes — QR codes &amp; liens de suivi</h1>
 
       <form onSubmit={create} className="card p-4 flex flex-wrap items-end gap-3">
+        <div>
+          <label className="block text-xs font-medium mb-1" htmlFor="qr-type">
+            Type
+          </label>
+          <select
+            id="qr-type"
+            className="input !w-auto"
+            value={type}
+            onChange={(e) => setType(e.target.value as "qr" | "link")}
+          >
+            <option value="qr">▣ QR code (support imprimé)</option>
+            <option value="link">🔗 Lien de suivi (bio, e-mail…)</option>
+          </select>
+        </div>
         <div className="flex-1 min-w-48">
           <label className="block text-xs font-medium mb-1" htmlFor="qr-name">
             Nom de la campagne
@@ -61,15 +85,27 @@ export default function QrCodesPage() {
           <input
             id="qr-name"
             className="input"
-            placeholder="Ex. : Flyer Paris, Salon 2026, Instagram…"
+            placeholder="Ex. : Flyer Paris, Bio Instagram, Newsletter…"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
           />
         </div>
-        <div className="flex-1 min-w-48">
+        <div className="w-40">
+          <label className="block text-xs font-medium mb-1" htmlFor="qr-channel">
+            Canal (optionnel)
+          </label>
+          <input
+            id="qr-channel"
+            className="input"
+            placeholder="instagram, flyer…"
+            value={channel}
+            onChange={(e) => setChannel(e.target.value)}
+          />
+        </div>
+        <div className="w-40">
           <label className="block text-xs font-medium mb-1" htmlFor="qr-slug">
-            Slug (optionnel — déduit du nom)
+            Slug (optionnel)
           </label>
           <input
             id="qr-slug"
@@ -81,7 +117,7 @@ export default function QrCodesPage() {
           />
         </div>
         <button type="submit" className="btn btn-primary" disabled={creating}>
-          {creating ? "Création…" : "+ Créer un QR code"}
+          {creating ? "Création…" : "+ Créer"}
         </button>
         {error && (
           <p className="w-full text-sm" style={{ color: "var(--critical)" }}>
@@ -105,8 +141,10 @@ export default function QrCodesPage() {
                   className="text-left text-xs border-b"
                   style={{ color: "var(--text-muted)", borderColor: "var(--grid)" }}
                 >
+                  <th className="py-2 pr-3 font-medium">Type</th>
                   <th className="py-2 pr-3 font-medium">Nom</th>
-                  <th className="py-2 pr-3 font-medium">URL de scan</th>
+                  <th className="py-2 pr-3 font-medium">Canal</th>
+                  <th className="py-2 pr-3 font-medium">URL trackée</th>
                   <th className="py-2 pr-3 font-medium text-right">Scans</th>
                   <th className="py-2 pr-3 font-medium text-right">Conversions</th>
                   <th className="py-2 pr-3 font-medium">Statut</th>
@@ -116,8 +154,14 @@ export default function QrCodesPage() {
               <tbody>
                 {qrcodes.map((qr) => (
                   <tr key={qr.id} className="border-b" style={{ borderColor: "var(--grid)" }}>
+                    <td className="py-2.5 pr-3">{qr.type === "link" ? "🔗" : "▣"}</td>
                     <td className="py-2.5 pr-3 font-medium">{qr.name}</td>
-                    <td className="py-2.5 pr-3 font-mono text-xs">/r/{qr.slug}</td>
+                    <td className="py-2.5 pr-3 text-xs" style={{ color: "var(--text-secondary)" }}>
+                      {qr.channel ?? "—"}
+                    </td>
+                    <td className="py-2.5 pr-3 font-mono text-xs">
+                      /{qr.type === "link" ? "l" : "r"}/{qr.slug}
+                    </td>
                     <td className="py-2.5 pr-3 text-right tabular-nums">
                       {qr.totalScans.toLocaleString("fr-FR")}
                     </td>

@@ -4,11 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useState } from "react";
 import QrDesigner from "@/components/QrDesigner";
+import TrackedLink from "@/components/TrackedLink";
 
 interface QrDetail {
   id: string;
   name: string;
   slug: string;
+  type: string;
+  channel: string | null;
   appStoreUrl: string;
   playStoreUrl: string;
   fallbackUrl: string;
@@ -80,6 +83,7 @@ export default function QrDetailPage({ params }: { params: Promise<{ id: string 
     if (!qr) return;
     await patch({
       name: qr.name,
+      channel: qr.channel,
       appStoreUrl: qr.appStoreUrl,
       playStoreUrl: qr.playStoreUrl,
       fallbackUrl: qr.fallbackUrl,
@@ -134,15 +138,27 @@ export default function QrDetailPage({ params }: { params: Promise<{ id: string 
             </span>
           </h2>
 
-          <div>
-            <label className="block text-xs font-medium mb-1" htmlFor="f-name">Nom</label>
-            <input
-              id="f-name"
-              className="input"
-              value={qr.name}
-              onChange={(e) => setQr({ ...qr, name: e.target.value })}
-              required
-            />
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="block text-xs font-medium mb-1" htmlFor="f-name">Nom</label>
+              <input
+                id="f-name"
+                className="input"
+                value={qr.name}
+                onChange={(e) => setQr({ ...qr, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="w-36">
+              <label className="block text-xs font-medium mb-1" htmlFor="f-channel">Canal</label>
+              <input
+                id="f-channel"
+                className="input"
+                placeholder="instagram…"
+                value={qr.channel ?? ""}
+                onChange={(e) => setQr({ ...qr, channel: e.target.value })}
+              />
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium mb-1" htmlFor="f-appstore">
@@ -207,7 +223,13 @@ export default function QrDetailPage({ params }: { params: Promise<{ id: string 
           </div>
         </form>
 
-        {/* QR code + logo */}
+        {/* QR code ou lien de suivi */}
+        {qr.type === "link" ? (
+          <div className="card p-5 space-y-4">
+            <h2 className="text-sm font-semibold">🔗 Lien de suivi</h2>
+            <TrackedLink slug={qr.slug} />
+          </div>
+        ) : (
         <div className="card p-5 space-y-4">
           <h2 className="text-sm font-semibold">QR code</h2>
           <QrDesigner slug={qr.slug} logo={qr.logo} />
@@ -240,6 +262,7 @@ export default function QrDetailPage({ params }: { params: Promise<{ id: string 
             </p>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

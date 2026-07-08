@@ -1,8 +1,11 @@
-# QR Platform — QR codes dynamiques auto-hébergés
+# QR Platform — QR codes dynamiques & marketing auto-hébergés (MINGGLE)
 
-Plateforme complète, open source et auto-hébergée, pour créer et gérer des **QR
-codes intelligents** pour votre application mobile : redirection automatique
-vers l'App Store / Google Play, statistiques en temps réel, respect du RGPD.
+Plateforme complète, open source et auto-hébergée, pour faire croître la marque
+MINGGLE : **QR codes intelligents** et **liens de suivi** (redirection
+automatique App Store / Google Play, statistiques temps réel, RGPD),
+**posts marketing** publiés sur le site et relayés aux réseaux sociaux, et
+**IA intégrée** (Claude) pour générer le contenu et analyser l'audience —
+jusqu'au mode **autopilote** hebdomadaire.
 Aucune dépendance à un service QR payant : le QR code fonctionne tant que votre
 domaine existe.
 
@@ -188,6 +191,56 @@ direct** (rafraîchis toutes les 5 s), **export CSV** (compatible Excel FR).
   suppression d'un QR code = suppression en cascade de ses scans.
 - **Rétention automatique** : `RETENTION_DAYS=395` purge les scans trop vieux.
 
+## Liens de suivi
+
+Même moteur que les QR codes, sans l'image : une campagne de type « Lien »
+donne une URL `https://monsite.com/l/{slug}` à placer en bio Instagram, story,
+e-mail, signature… Détection d'appareil, redirection intelligente et tracking
+identiques. Ajoutez `?utm_source=story` pour distinguer les placements — la
+source apparaît dans le tableau de bord et l'export CSV. Chaque campagne porte
+un **canal** (instagram, flyer, email…) pour comparer les performances.
+
+## Posts marketing & IA (Claude)
+
+- **Posts** : rédigez (ou générez) des posts en markdown dans l'admin ; publiés,
+  ils apparaissent sur la page publique `/news` avec un bouton de
+  téléchargement **tracké** (attribution par campagne).
+- **Génération par Claude** (`ANTHROPIC_API_KEY` requise) : bouton « Générer un
+  brouillon » — Claude s'appuie sur vos statistiques réelles (appareils,
+  canaux, villes, conversions) et vos posts existants pour rédiger un contenu
+  original. Toujours relire avant de publier.
+- **Analyse IA de l'audience** : sur le tableau de bord, Claude croise toutes
+  les données et rend une analyse actionnable (ce qui marche / ne marche pas /
+  3-5 recommandations priorisées).
+- Coût : facturation Anthropic à l'usage — de l'ordre de quelques centimes par
+  post/analyse avec le modèle par défaut (`claude-opus-4-8`, modifiable via
+  `AI_MODEL`).
+
+### Publication automatique sur les réseaux sociaux
+
+Les API d'Instagram/TikTok/Facebook exigent des comptes business et des
+validations d'application : la voie pragmatique et gratuite est un **webhook**.
+À chaque publication de post, la plateforme envoie un POST JSON
+(titre, accroche, contenu, hashtags, URL) vers `SOCIAL_WEBHOOK_URL`.
+Branchez-y :
+
+- **Make** (gratuit jusqu'à 1 000 opérations/mois) ou **Zapier** : scénario
+  « Webhook → publier sur Instagram/Facebook/LinkedIn/X » ;
+- ou **Buffer** (plan gratuit) via leur intégration Zapier.
+
+Une fois le scénario configuré, chaque post publié sur `/news` part
+automatiquement sur vos réseaux — zéro action manuelle.
+
+### Autopilote marketing
+
+Avec `AUTOPILOT=1` + `ANTHROPIC_API_KEY` (+ `SOCIAL_WEBHOOK_URL` pour le relais
+réseaux), le cron Vercel (`vercel.json`, chaque lundi 9 h UTC) fait tout seul :
+Claude analyse les 30 derniers jours de données → rédige un post original →
+le publie sur `/news` → le relaie aux réseaux via le webhook. Ajustez la
+fréquence dans `vercel.json` (le plan Hobby autorise au plus un déclenchement
+quotidien). Protégez l'endpoint avec `CRON_SECRET` (envoyé automatiquement par
+Vercel en en-tête `Authorization`).
+
 ## Suivi des conversions
 
 Endpoint public (aucune donnée personnelle) à appeler depuis votre app mobile
@@ -222,3 +275,8 @@ comparaison des campagnes.
 | `GEOIP_DISABLED` | non | `1` = aucun appel à ip-api.com |
 | `RETENTION_DAYS` | non | Purge automatique des scans plus vieux que N jours |
 | `DASHBOARD_TZ` | non | Fuseau du tableau de bord (défaut `Europe/Paris`) |
+| `ANTHROPIC_API_KEY` | non | Active la génération de posts et l'analyse IA (console.anthropic.com) |
+| `AI_MODEL` | non | Modèle Claude (défaut `claude-opus-4-8`) |
+| `SOCIAL_WEBHOOK_URL` | non | Webhook Zapier/Make/Buffer appelé à chaque publication de post |
+| `AUTOPILOT` | non | `1` = post hebdomadaire 100 % automatique (cron Vercel) |
+| `CRON_SECRET` | non | Protège l'endpoint `/api/cron/autopilot` |

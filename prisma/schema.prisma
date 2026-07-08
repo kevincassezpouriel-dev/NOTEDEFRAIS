@@ -7,13 +7,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Un QR code = une campagne (Flyer Paris, Salon, Instagram…).
-/// Les URLs de destination sont modifiables sans changer le QR code :
-/// le QR pointe toujours vers /r/{slug}.
+/// Une campagne = un QR code OU un lien de suivi (Flyer Paris, Salon, Instagram…).
+/// Les URLs de destination sont modifiables sans changer le QR/lien :
+/// il pointe toujours vers /r/{slug} (ou /l/{slug}).
 model QrCode {
   id           String       @id @default(cuid())
   name         String
   slug         String       @unique
+  type         String       @default("qr") // "qr" | "link"
+  channel      String? // canal marketing : instagram, tiktok, email, flyer…
   appStoreUrl  String
   playStoreUrl String
   fallbackUrl  String
@@ -22,6 +24,25 @@ model QrCode {
   createdAt    DateTime     @default(now())
   scans        ScanEvent[]
   conversions  Conversion[]
+  posts        Post[]
+}
+
+/// Post marketing publié sur le site (/news), rédigé à la main ou généré
+/// par Claude. À la publication, un webhook (SOCIAL_WEBHOOK_URL) peut
+/// relayer le post vers les réseaux sociaux via Zapier/Make/Buffer.
+model Post {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  excerpt     String?
+  content     String // markdown simple
+  hashtags    String? // séparés par des espaces, ex. "#MINGGLE #app"
+  status      String    @default("draft") // "draft" | "published"
+  aiGenerated Boolean   @default(false)
+  qrCode      QrCode?   @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  qrCodeId    String?
+  createdAt   DateTime  @default(now())
+  publishedAt DateTime?
 }
 
 /// Un scan = un passage par /r/{slug}. IP anonymisée avant stockage (RGPD).

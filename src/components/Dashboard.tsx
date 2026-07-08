@@ -8,6 +8,7 @@ import DeviceSplit from "./DeviceSplit";
 import TopList from "./TopList";
 import WorldMap, { CityPoint } from "./WorldMap";
 import RecentScans from "./RecentScans";
+import AiInsights from "./AiInsights";
 
 interface QrSummary {
   id: string;
@@ -210,6 +211,9 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Analyse IA */}
+      <AiInsights days={days} />
 
       {/* Comparaison des campagnes */}
       <div className="card p-4">

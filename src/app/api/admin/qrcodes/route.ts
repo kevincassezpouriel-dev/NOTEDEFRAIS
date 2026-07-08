@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => null)) as {
     name?: string;
     slug?: string;
+    type?: string;
+    channel?: string;
     appStoreUrl?: string;
     playStoreUrl?: string;
     fallbackUrl?: string;
@@ -45,6 +47,8 @@ export async function POST(req: NextRequest) {
     data: {
       name: body.name.trim(),
       slug,
+      type: body.type === "link" ? "link" : "qr",
+      channel: body.channel?.trim() || null,
       appStoreUrl: body.appStoreUrl?.trim() ?? "",
       playStoreUrl: body.playStoreUrl?.trim() ?? "",
       fallbackUrl: body.fallbackUrl?.trim() ?? "",

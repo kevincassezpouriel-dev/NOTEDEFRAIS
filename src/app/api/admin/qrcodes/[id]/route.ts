@@ -26,6 +26,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const body = (await req.json().catch(() => null)) as {
     name?: string;
     slug?: string;
+    channel?: string | null;
     appStoreUrl?: string;
     playStoreUrl?: string;
     fallbackUrl?: string;
@@ -54,6 +55,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       data: {
         ...(body.name !== undefined ? { name: body.name.trim() } : {}),
         ...(body.slug !== undefined ? { slug: body.slug } : {}),
+        ...(body.channel !== undefined ? { channel: body.channel?.trim() || null } : {}),
         ...(body.appStoreUrl !== undefined ? { appStoreUrl: body.appStoreUrl.trim() } : {}),
         ...(body.playStoreUrl !== undefined ? { playStoreUrl: body.playStoreUrl.trim() } : {}),
         ...(body.fallbackUrl !== undefined ? { fallbackUrl: body.fallbackUrl.trim() } : {}),
