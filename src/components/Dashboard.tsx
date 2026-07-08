@@ -26,12 +26,16 @@ interface Stats {
   byDay: DayPoint[];
   devices: Record<string, number>;
   redirects: Record<string, number>;
+  browsers: Record<string, number>;
+  referrers: { referrer: string; count: number }[];
   countries: { country: string; countryCode: string | null; count: number }[];
   cities: CityPoint[];
   perQr: {
     id: string;
     name: string;
     slug: string;
+    type: string;
+    channel: string | null;
     active: boolean;
     total: number;
     conversions: number;
@@ -212,6 +216,33 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="card p-4">
+          <h2 className="text-sm font-semibold mb-3">Sources de trafic</h2>
+          {stats && (
+            <TopList
+              emptyLabel="Aucune source identifiée (ajoutez ?utm_source=… à vos liens)."
+              items={stats.referrers.slice(0, 8).map((r) => ({
+                label: r.referrer,
+                count: r.count,
+              }))}
+            />
+          )}
+        </div>
+        <div className="card p-4">
+          <h2 className="text-sm font-semibold mb-3">Navigateurs</h2>
+          {stats && (
+            <TopList
+              emptyLabel="Aucun scan sur la période."
+              items={Object.entries(stats.browsers)
+                .map(([label, count]) => ({ label, count }))
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 8)}
+            />
+          )}
+        </div>
+      </div>
+
       {/* Analyse IA */}
       <AiInsights days={days} />
 
@@ -227,6 +258,7 @@ export default function Dashboard() {
                   style={{ color: "var(--text-muted)", borderColor: "var(--grid)" }}
                 >
                   <th className="py-2 pr-3 font-medium">Campagne</th>
+                  <th className="py-2 pr-3 font-medium">Canal</th>
                   <th className="py-2 pr-3 font-medium text-right">Aujourd&apos;hui</th>
                   <th className="py-2 pr-3 font-medium text-right">Période ({days} j)</th>
                   <th className="py-2 pr-3 font-medium text-right">Total</th>
@@ -238,6 +270,7 @@ export default function Dashboard() {
                 {stats.perQr.map((qr) => (
                   <tr key={qr.id} className="border-b" style={{ borderColor: "var(--grid)" }}>
                     <td className="py-2 pr-3">
+                      <span className="mr-1.5">{qr.type === "link" ? "🔗" : "▣"}</span>
                       <Link href={`/admin/qrcodes/${qr.id}`} className="underline">
                         {qr.name}
                       </Link>
@@ -246,6 +279,9 @@ export default function Dashboard() {
                           (désactivé)
                         </span>
                       )}
+                    </td>
+                    <td className="py-2 pr-3 text-xs" style={{ color: "var(--text-secondary)" }}>
+                      {qr.channel ?? "—"}
                     </td>
                     <td className="py-2 pr-3 text-right tabular-nums">{qr.today}</td>
                     <td className="py-2 pr-3 text-right tabular-nums">{qr.period}</td>
