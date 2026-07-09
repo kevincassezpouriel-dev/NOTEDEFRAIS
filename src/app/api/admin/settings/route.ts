@@ -2,16 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSettings, setSettings, type AutopilotMode } from "@/lib/settings";
 import { aiEnabled } from "@/lib/ai";
 import { emailEnabled } from "@/lib/email";
+import { getSocialConfig, setSocialConfig } from "@/lib/webhook";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const settings = await getSettings();
+  const [settings, social] = await Promise.all([getSettings(), getSocialConfig()]);
   return NextResponse.json({
     ...settings,
+    socialWebhookUrl: social.url,
+    socialNetworks: social.networks,
     aiEnabled: aiEnabled(),
     emailEnabled: emailEnabled(),
-    webhookEnabled: Boolean(process.env.SOCIAL_WEBHOOK_URL),
+    webhookEnabled: Boolean(social.url),
   });
 }
 
@@ -20,6 +23,8 @@ export async function PATCH(req: NextRequest) {
     autopilotMode?: AutopilotMode;
     reportEmail?: string;
     monthlyBudgetEur?: number;
+    socialWebhookUrl?: string;
+    socialNetworks?: string[];
   } | null;
   if (!body) return NextResponse.json({ error: "Requête invalide" }, { status: 400 });
 
@@ -29,6 +34,14 @@ export async function PATCH(req: NextRequest) {
   ) {
     return NextResponse.json({ error: "Mode invalide" }, { status: 400 });
   }
+  if (
+    body.socialWebhookUrl !== undefined &&
+    body.socialWebhookUrl.trim() !== "" &&
+    !/^https?:\/\//i.test(body.socialWebhookUrl.trim())
+  ) {
+    return NextResponse.json({ error: "L'URL du webhook doit commencer par https://" }, { status: 400 });
+  }
+
   await setSettings({
     ...(body.autopilotMode !== undefined ? { autopilotMode: body.autopilotMode } : {}),
     ...(body.reportEmail !== undefined ? { reportEmail: body.reportEmail.trim() } : {}),
@@ -36,5 +49,16 @@ export async function PATCH(req: NextRequest) {
       ? { monthlyBudgetEur: Math.max(0, Number(body.monthlyBudgetEur) || 0) }
       : {}),
   });
-  return NextResponse.json(await getSettings());
+  await setSocialConfig({
+    ...(body.socialWebhookUrl !== undefined ? { url: body.socialWebhookUrl } : {}),
+    ...(body.socialNetworks !== undefined ? { networks: body.socialNetworks } : {}),
+  });
+
+  const [settings, social] = await Promise.all([getSettings(), getSocialConfig()]);
+  return NextResponse.json({
+    ...settings,
+    socialWebhookUrl: social.url,
+    socialNetworks: social.networks,
+    webhookEnabled: Boolean(social.url),
+  });
 }

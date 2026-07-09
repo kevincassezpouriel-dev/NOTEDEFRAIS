@@ -29,6 +29,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     hashtags?: string | null;
     qrCodeId?: string | null;
     campaignId?: string | null;
+    visual?: Record<string, unknown> | null;
     status?: "draft" | "published" | "scheduled";
     scheduledAt?: string | null;
   } | null;
@@ -103,6 +104,7 @@ function cleanData(body: {
   hashtags?: string | null;
   qrCodeId?: string | null;
   campaignId?: string | null;
+  visual?: Record<string, unknown> | null;
 }) {
   return {
     ...(body.title !== undefined ? { title: body.title.trim() } : {}),
@@ -111,5 +113,6 @@ function cleanData(body: {
     ...(body.hashtags !== undefined ? { hashtags: body.hashtags?.trim() || null } : {}),
     ...(body.qrCodeId !== undefined ? { qrCodeId: body.qrCodeId || null } : {}),
     ...(body.campaignId !== undefined ? { campaignId: body.campaignId || null } : {}),
+    ...(body.visual !== undefined ? { visual: body.visual ? JSON.stringify(body.visual) : null } : {}),
   };
 }

@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import { aiEnabled, generateMarketingPost } from "./ai";
 import { computeStats, statsSummaryForAi } from "./stats";
 import { refreshLearnings, topLearnings } from "./learnings";
+import { performanceBrief } from "./performance";
 import { createPost, publishPost } from "./posts";
 import { getSettings } from "./settings";
 import { logAction } from "./actions";
@@ -40,10 +41,11 @@ export async function runMarketingCycle(origin: string): Promise<CycleResult> {
   // 1. Mémoire : l'IA apprend de la période écoulée
   const learningsAdded = stats.period > 0 ? await refreshLearnings(summary) : 0;
 
-  // 2. Rédaction, guidée par les apprentissages accumulés
-  const [existingPosts, learnings, defaultAsset] = await Promise.all([
+  // 2. Rédaction, guidée par les apprentissages ET les performances réelles
+  const [existingPosts, learnings, perfBrief, defaultAsset] = await Promise.all([
     prisma.post.findMany({ select: { title: true }, orderBy: { createdAt: "desc" }, take: 15 }),
     topLearnings(),
+    performanceBrief(),
     prisma.qrCode.findFirst({ orderBy: { createdAt: "asc" } }),
   ]);
 
@@ -52,6 +54,7 @@ export async function runMarketingCycle(origin: string): Promise<CycleResult> {
     trackedUrl: assetUrl(origin, defaultAsset),
     existingTitles: existingPosts.map((p) => p.title),
     learnings,
+    performanceBrief: perfBrief,
   });
 
   const draft = await createPost({
@@ -63,6 +66,7 @@ export async function runMarketingCycle(origin: string): Promise<CycleResult> {
     qrCodeId: defaultAsset?.id ?? null,
     campaignId: defaultAsset?.campaignId ?? null,
     aiGenerated: true,
+    visual: generated.visual,
   });
 
   await logAction({

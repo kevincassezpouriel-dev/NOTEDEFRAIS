@@ -18,6 +18,15 @@ export async function generateMetadata({ params }: Props) {
   return {
     title: post ? `${post.title} — MINGGLE` : "Article — MINGGLE",
     description: post?.excerpt ?? undefined,
+    openGraph: post
+      ? {
+          title: post.title,
+          description: post.excerpt ?? undefined,
+          // Visuel de marque généré : c'est lui qui apparaît dans les
+          // aperçus de partage (WhatsApp, LinkedIn, Facebook, X…)
+          images: [{ url: `/api/og/${slug}`, width: 1200, height: 630 }],
+        }
+      : undefined,
   };
 }
 
@@ -41,7 +50,15 @@ export default async function PostPage({ params }: Props) {
         <Link href="/news" className="text-sm underline" style={{ color: "var(--text-muted)" }}>
           ← Toutes les actualités
         </Link>
-        <h1 className="text-3xl font-semibold mt-4 mb-2">{post.title}</h1>
+        {/* Visuel de marque du post (généré par /api/og) */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/api/og/${post.slug}`}
+          alt=""
+          className="w-full rounded-xl mt-4 border"
+          style={{ borderColor: "var(--border)" }}
+        />
+        <h1 className="text-3xl font-semibold mt-6 mb-2">{post.title}</h1>
         <p className="text-xs mb-8" style={{ color: "var(--text-muted)" }}>
           {post.publishedAt?.toLocaleDateString("fr-FR", {
             day: "numeric",

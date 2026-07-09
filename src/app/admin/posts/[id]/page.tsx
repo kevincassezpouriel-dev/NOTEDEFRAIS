@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useState } from "react";
+import { parseVisual, TEMPLATES, type VisualSpec } from "@/lib/visual";
 
 interface PostDetail {
   id: string;
@@ -13,6 +14,7 @@ interface PostDetail {
   hashtags: string | null;
   status: string;
   aiGenerated: boolean;
+  visual: string | null;
   qrCodeId: string | null;
   campaignId: string | null;
 }
@@ -26,6 +28,8 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
   const { id } = use(params);
   const router = useRouter();
   const [post, setPost] = useState<PostDetail | null>(null);
+  const [visual, setVisual] = useState<VisualSpec | null>(null);
+  const [visualVersion, setVisualVersion] = useState(0); // force le refresh de l'aperçu
   const [qrcodes, setQrcodes] = useState<Option[]>([]);
   const [campaigns, setCampaigns] = useState<Option[]>([]);
   const [scheduledAt, setScheduledAt] = useState("");
@@ -38,7 +42,11 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
       fetch("/api/admin/qrcodes", { cache: "no-store" }),
       fetch("/api/admin/campaigns", { cache: "no-store" }),
     ]);
-    if (postRes.ok) setPost(await postRes.json());
+    if (postRes.ok) {
+      const p = (await postRes.json()) as PostDetail;
+      setPost(p);
+      setVisual(parseVisual(p.visual, p.title));
+    }
     if (qrRes.ok) setQrcodes(await qrRes.json());
     if (campRes.ok) setCampaigns(await campRes.json());
   }, [id]);
@@ -58,6 +66,7 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
     setBusy(false);
     if (res.ok) {
       setPost(await res.json());
+      setVisualVersion((v) => v + 1); // rafraîchit l'aperçu du visuel
       setMessage({ text: successMessage, error: false });
     } else {
       const body = await res.json().catch(() => null);
@@ -76,6 +85,7 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
         hashtags: post.hashtags,
         qrCodeId: post.qrCodeId,
         campaignId: post.campaignId,
+        visual,
       },
       "✓ Enregistré."
     );
@@ -147,6 +157,102 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
             required
           />
         </div>
+        {/* Visuel de marque : le « montage » du post, éditable */}
+        {visual && (
+          <div className="border-t pt-4 space-y-3" style={{ borderColor: "var(--grid)" }}>
+            <p className="text-xs font-medium">
+              🎨 Visuel de marque{" "}
+              <span className="font-normal" style={{ color: "var(--text-muted)" }}>
+                — composé automatiquement aux couleurs de votre identité (palette verrouillée).
+                Enregistrez pour rafraîchir l&apos;aperçu.
+              </span>
+            </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/api/og/${post.slug}?v=${visualVersion}`}
+              alt="Aperçu du visuel du post"
+              className="w-full max-w-lg rounded-lg border"
+              style={{ borderColor: "var(--border)" }}
+            />
+            <div className="flex flex-wrap gap-3">
+              <div>
+                <label className="block text-xs font-medium mb-1" htmlFor="v-template">Gabarit</label>
+                <select
+                  id="v-template"
+                  className="input !w-auto"
+                  value={visual.template}
+                  onChange={(e) => setVisual({ ...visual, template: e.target.value as VisualSpec["template"] })}
+                >
+                  {TEMPLATES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" htmlFor="v-accent">Accent</label>
+                <select
+                  id="v-accent"
+                  className="input !w-auto"
+                  value={visual.accent}
+                  onChange={(e) => setVisual({ ...visual, accent: e.target.value as VisualSpec["accent"] })}
+                >
+                  <option value="primaire">Couleur principale</option>
+                  <option value="secondaire">Couleur secondaire</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" htmlFor="v-mode">Fond</label>
+                <select
+                  id="v-mode"
+                  className="input !w-auto"
+                  value={visual.mode}
+                  onChange={(e) => setVisual({ ...visual, mode: e.target.value as VisualSpec["mode"] })}
+                >
+                  <option value="sombre">Sombre</option>
+                  <option value="clair">Clair</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <div className="flex-1 min-w-56">
+                <label className="block text-xs font-medium mb-1" htmlFor="v-headline">
+                  Accroche sur l&apos;image (courte)
+                </label>
+                <input
+                  id="v-headline"
+                  className="input"
+                  maxLength={90}
+                  value={visual.headline}
+                  onChange={(e) => setVisual({ ...visual, headline: e.target.value })}
+                />
+              </div>
+              <div className="flex-1 min-w-56">
+                <label className="block text-xs font-medium mb-1" htmlFor="v-subline">
+                  Ligne secondaire (optionnelle)
+                </label>
+                <input
+                  id="v-subline"
+                  className="input"
+                  maxLength={110}
+                  value={visual.subline}
+                  onChange={(e) => setVisual({ ...visual, subline: e.target.value })}
+                />
+              </div>
+            </div>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Formats fournis aux réseaux : 1200×630 (partages) et 1080×1080 (Instagram,{" "}
+              <a
+                href={`/api/og/${post.slug}?format=carre`}
+                target="_blank"
+                className="underline"
+              >
+                voir le carré ↗
+              </a>
+              ).
+            </p>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-3">
           <div className="flex-1 min-w-48">
             <label className="block text-xs font-medium mb-1" htmlFor="p-hashtags">Hashtags</label>

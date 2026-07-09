@@ -63,6 +63,7 @@ model Post {
   hashtags    String? // séparés par des espaces, ex. "#MINGGLE #app"
   status      String    @default("draft") // draft | scheduled | published
   aiGenerated Boolean   @default(false)
+  visual      String? // spec visuelle JSON (gabarit, accroche, accent, mode) — rendue par /api/og/{slug}
   utmSource   String?   @unique // "post-{slug}" — clé d'attribution (rempli à la création)
   scheduledAt DateTime? // publication programmée (calendrier éditorial)
   qrCode      QrCode?   @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)

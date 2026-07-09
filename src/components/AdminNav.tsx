@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/admin/campaigns", label: "Campagnes" },
   { href: "/admin/qrcodes", label: "QR & liens" },
   { href: "/admin/posts", label: "Posts" },
+  { href: "/admin/calendrier", label: "Calendrier" },
   { href: "/admin/reglages", label: "Réglages" },
   { href: "/admin/rgpd", label: "RGPD" },
 ];

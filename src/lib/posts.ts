@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import { notifySocialWebhook } from "./webhook";
 import { postUtmSource } from "./attribution";
 import { logAction } from "./actions";
+import { defaultVisual, type VisualSpec } from "./visual";
 
 /** Suffixe -2, -3… si le slug est déjà pris. */
 export async function uniquePostSlug(base: string): Promise<string> {
@@ -24,9 +25,11 @@ export interface CreatePostInput {
   qrCodeId?: string | null;
   campaignId?: string | null;
   aiGenerated?: boolean;
+  visual?: VisualSpec | null;
 }
 
-/** Crée un post en garantissant slug ET utm_source uniques (attribution). */
+/** Crée un post en garantissant slug ET utm_source uniques (attribution).
+ *  Chaque post reçoit une spec visuelle (fournie par l'IA ou dérivée du titre). */
 export async function createPost(input: CreatePostInput): Promise<Post> {
   const slug = await uniquePostSlug(input.slug);
   const post = await prisma.post.create({
@@ -39,6 +42,7 @@ export async function createPost(input: CreatePostInput): Promise<Post> {
       qrCodeId: input.qrCodeId ?? null,
       campaignId: input.campaignId ?? null,
       aiGenerated: input.aiGenerated ?? false,
+      visual: JSON.stringify(input.visual ?? defaultVisual(input.title)),
       utmSource: postUtmSource(slug),
     },
   });

@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { slugify } from "./validate";
+import { buildBrandSystem, getBrand } from "./brand";
+import type { VisualSpec } from "./visual";
 
 /**
  * Intégration Claude (API Anthropic) : génération de posts marketing et
@@ -20,16 +22,6 @@ function client(): Anthropic {
   return _client;
 }
 
-const BRAND_SYSTEM = `Tu es le responsable marketing de MINGGLE, une application mobile.
-Tu écris en français, avec un ton moderne, direct et enthousiaste — jamais
-ampoulé ni robotique. Ton unique objectif : faire connaître MINGGLE au plus
-grand nombre et donner envie de télécharger l'application.
-Règles :
-- Pas de superlatifs creux ("révolutionnaire", "incroyable") ni de jargon.
-- Des phrases courtes. Un appel à l'action clair.
-- Les posts doivent être directement publiables sur un site et adaptables
-  aux réseaux sociaux (Instagram, TikTok, LinkedIn, Facebook).`;
-
 const POST_SCHEMA = {
   type: "object" as const,
   properties: {
@@ -47,8 +39,42 @@ const POST_SCHEMA = {
       items: { type: "string" as const },
       description: "3 à 6 hashtags pertinents, avec le #",
     },
+    visual: {
+      type: "object" as const,
+      description:
+        "Direction artistique du visuel de marque qui accompagne le post (rendu automatiquement aux couleurs de la marque)",
+      properties: {
+        template: {
+          type: "string" as const,
+          enum: ["annonce", "astuce", "stat", "citation"],
+          description:
+            "Gabarit : annonce (grand titre), astuce (pastille conseil), stat (chiffre fort en très grand), citation (verbatim)",
+        },
+        headline: {
+          type: "string" as const,
+          description:
+            "Punchline COURTE affichée en grand sur l'image (max 60 caractères). Pas un copier-coller du titre : pensée pour l'image. Pour le gabarit stat : le chiffre seul (ex. « 3× », « +120 % »)",
+        },
+        subline: {
+          type: "string" as const,
+          description: "Ligne secondaire sur l'image (max 90 caractères, ou vide)",
+        },
+        accent: {
+          type: "string" as const,
+          enum: ["primaire", "secondaire"],
+          description: "Couleur d'accent (dans la palette de marque verrouillée)",
+        },
+        mode: {
+          type: "string" as const,
+          enum: ["sombre", "clair"],
+          description: "Fond sombre (impactant) ou clair (léger) selon le ton du post",
+        },
+      },
+      required: ["template", "headline", "subline", "accent", "mode"],
+      additionalProperties: false,
+    },
   },
-  required: ["title", "excerpt", "content", "hashtags"],
+  required: ["title", "excerpt", "content", "hashtags", "visual"],
   additionalProperties: false,
 };
 
@@ -58,6 +84,7 @@ export interface GeneratedPost {
   excerpt: string;
   content: string;
   hashtags: string[];
+  visual: VisualSpec;
 }
 
 export async function generateMarketingPost(opts: {
@@ -68,6 +95,7 @@ export async function generateMarketingPost(opts: {
   trackedUrl?: string;
   existingTitles?: string[];
   learnings?: string[];
+  performanceBrief?: string;
 }): Promise<GeneratedPost> {
   const parts: string[] = [];
   if (opts.brief) {
@@ -87,6 +115,9 @@ export async function generateMarketingPost(opts: {
       `Ce que tu as appris des performances passées (APPLIQUE ces leçons) :\n- ${opts.learnings.join("\n- ")}`
     );
   }
+  if (opts.performanceBrief) {
+    parts.push(opts.performanceBrief);
+  }
   if (opts.trackedUrl) {
     parts.push(
       `Intègre naturellement ce lien de téléchargement dans le contenu (c'est un lien tracké) : ${opts.trackedUrl}`
@@ -103,11 +134,12 @@ export async function generateMarketingPost(opts: {
     );
   }
 
+  const brand = await getBrand();
   const response = await client().messages.create({
     model: MODEL,
     max_tokens: 16000,
     thinking: { type: "adaptive" },
-    system: BRAND_SYSTEM,
+    system: buildBrandSystem(brand),
     output_config: { format: { type: "json_schema", schema: POST_SCHEMA } },
     messages: [{ role: "user", content: parts.join("\n\n") }],
   });
@@ -126,11 +158,12 @@ export async function generateMarketingPost(opts: {
  * recommandations concrètes pour faire croître MINGGLE).
  */
 export async function analyzeAudience(statsJson: string, days: number): Promise<string> {
+  const brand = await getBrand();
   const response = await client().messages.create({
     model: MODEL,
     max_tokens: 16000,
     thinking: { type: "adaptive" },
-    system: `Tu es analyste growth marketing pour la marque MINGGLE (application mobile).
+    system: `Tu es analyste growth marketing pour la marque ${brand.name} (application mobile).
 On te fournit les statistiques brutes des QR codes et liens de suivi
 (scans par jour, appareils, pays/villes, navigateurs dont in-app Instagram/
 TikTok, sources de trafic, conversions par campagne).
@@ -140,7 +173,8 @@ Format de réponse (markdown) :
 ## Ce qui ne fonctionne pas
 ## Recommandations (3 à 5 actions concrètes, priorisées)
 Sois précis et chiffré (cite les données). Si les données sont trop maigres
-pour conclure, dis-le honnêtement et recommande quoi mesurer.`,
+pour conclure, dis-le honnêtement et recommande quoi mesurer.
+Objectif de la marque : faire croître ${brand.name} au plus grand nombre.`,
     messages: [
       {
         role: "user",

@@ -4,6 +4,7 @@ import { aiEnabled, generateMarketingPost } from "@/lib/ai";
 import { computeStats, statsSummaryForAi } from "@/lib/stats";
 import { createPost } from "@/lib/posts";
 import { topLearnings } from "@/lib/learnings";
+import { performanceBrief } from "@/lib/performance";
 import { assetUrl } from "@/lib/engine";
 
 export const dynamic = "force-dynamic";
@@ -40,12 +41,13 @@ export async function POST(req: NextRequest) {
       : Promise.resolve(null),
   ]);
 
-  const [existingPosts, statsSummary, learnings] = await Promise.all([
+  const [existingPosts, statsSummary, learnings, perfBrief] = await Promise.all([
     prisma.post.findMany({ select: { title: true }, orderBy: { createdAt: "desc" }, take: 10 }),
     body.useStats !== false
       ? computeStats(undefined, 30).then(statsSummaryForAi)
       : Promise.resolve(undefined),
     topLearnings(),
+    performanceBrief(),
   ]);
 
   const origin = process.env.APP_BASE_URL || req.nextUrl.origin;
@@ -61,6 +63,7 @@ export async function POST(req: NextRequest) {
       statsSummary,
       existingTitles: existingPosts.map((p) => p.title),
       learnings,
+      performanceBrief: perfBrief,
     });
 
     const post = await createPost({
@@ -72,6 +75,7 @@ export async function POST(req: NextRequest) {
       qrCodeId: qr?.id ?? null,
       campaignId: resolvedCampaignId,
       aiGenerated: true,
+      visual: generated.visual,
     });
     return NextResponse.json(post, { status: 201 });
   } catch (err) {
