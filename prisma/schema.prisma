@@ -7,9 +7,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Une campagne = un QR code OU un lien de suivi (Flyer Paris, Salon, Instagram…).
-/// Les URLs de destination sont modifiables sans changer le QR/lien :
-/// il pointe toujours vers /r/{slug} (ou /l/{slug}).
+/// Une Campagne = un OBJECTIF marketing (Lancement v2, Salon de Paris,
+/// Acquisition Instagram Q1…). C'est l'unité d'organisation centrale : elle
+/// relie ses assets trackés (QR codes + liens), ses posts, sa timeline
+/// d'actions et les apprentissages que l'IA en tire. Une campagne peut donc
+/// regrouper PLUSIEURS points d'acquisition (un QR flyer + un lien bio + un
+/// lien e-mail) au service d'un même but, et mesurer le tout ensemble.
+model Campaign {
+  id         String     @id @default(cuid())
+  name       String
+  objective  String? // le but en une phrase, sert aussi de contexte à l'IA
+  status     String     @default("active") // active | paused | archived
+  createdAt  DateTime   @default(now())
+  archivedAt DateTime?
+  assets     QrCode[]
+  posts      Post[]
+  actions    Action[]
+  learnings  Learning[]
+}
+
+/// Un asset tracké : un QR code OU un lien de suivi. Les URLs de destination
+/// sont modifiables sans changer le QR/lien : il pointe toujours vers
+/// /r/{slug} (ou /l/{slug}). Rattaché à une campagne (optionnel).
 model QrCode {
   id           String       @id @default(cuid())
   name         String
@@ -22,14 +41,19 @@ model QrCode {
   logo         String? // logo au centre du QR, stocké en data-URL (max ~200 Ko)
   active       Boolean      @default(true)
   createdAt    DateTime     @default(now())
+  campaign     Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId   String?
   scans        ScanEvent[]
   conversions  Conversion[]
   posts        Post[]
+
+  @@index([campaignId])
 }
 
 /// Post marketing publié sur le site (/news), rédigé à la main ou généré
 /// par Claude. À la publication, un webhook (SOCIAL_WEBHOOK_URL) peut
 /// relayer le post vers les réseaux sociaux via Zapier/Make/Buffer.
+/// utmSource unique ("post-{slug}") = attribution des clics/installs au post.
 model Post {
   id          String    @id @default(cuid())
   title       String
@@ -37,12 +61,63 @@ model Post {
   excerpt     String?
   content     String // markdown simple
   hashtags    String? // séparés par des espaces, ex. "#MINGGLE #app"
-  status      String    @default("draft") // "draft" | "published"
+  status      String    @default("draft") // draft | scheduled | published
   aiGenerated Boolean   @default(false)
+  utmSource   String?   @unique // "post-{slug}" — clé d'attribution (rempli à la création)
+  scheduledAt DateTime? // publication programmée (calendrier éditorial)
   qrCode      QrCode?   @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
   qrCodeId    String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId  String?
   createdAt   DateTime  @default(now())
   publishedAt DateTime?
+
+  @@index([campaignId])
+  @@index([status, scheduledAt])
+}
+
+/// Timeline d'actions d'une campagne : tout événement marquant est journalisé
+/// ici (création d'asset, génération/publication de post, analyse IA, cycle
+/// d'autopilote, alerte…). C'est le fil qui relie une campagne à ses actions.
+model Action {
+  id         String    @id @default(cuid())
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String?
+  type       String // asset.created | post.generated | post.published | analysis.run | learning.saved | autopilot.run | alert | report.sent
+  actor      String    @default("human") // human | ai | autopilot
+  title      String
+  detail     String? // markdown court
+  status     String    @default("done") // done | pending | failed
+  refType    String? // "post" | "qr" — objet concerné
+  refId      String?
+  createdAt  DateTime  @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([createdAt])
+}
+
+/// Mémoire de l'IA : leçons durables tirées des données (« les posts angle
+/// astuce convertissent 3× mieux »). L'autopilote les relit AVANT de générer,
+/// ce qui lui permet de s'améliorer au fil des semaines.
+model Learning {
+  id         String    @id @default(cuid())
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId String?
+  insight    String // la leçon, en une phrase actionnable
+  evidence   String? // la donnée qui la fonde
+  weight     Int       @default(1) // importance ; les plus lourdes priment
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+
+  @@index([active, weight])
+}
+
+/// Configuration clé/valeur (mode autopilote, plafond budgétaire, e-mail de
+/// rapport…). Éditable dans l'admin, sans redéploiement.
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 /// Un scan = un passage par /r/{slug}. IP anonymisée avant stockage (RGPD).
@@ -66,6 +141,7 @@ model ScanEvent {
 
   @@index([qrCodeId, createdAt])
   @@index([createdAt])
+  @@index([referrer])
 }
 
 /// Conversion post-installation : l'app mobile appelle /api/convert au premier
@@ -76,6 +152,7 @@ model Conversion {
   qrCodeId  String
   createdAt DateTime @default(now())
   platform  String? // ios | android
+  source    String? // utm_source au moment de l'install (attribution post)
 
   @@index([qrCodeId, createdAt])
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { aiEnabled, analyzeAudience } from "@/lib/ai";
 import { computeStats, statsSummaryForAi } from "@/lib/stats";
+import { refreshLearnings } from "@/lib/learnings";
+import { logAction } from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -29,8 +31,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const analysis = await analyzeAudience(statsSummaryForAi(stats), days);
-    return NextResponse.json({ analysis, days });
+    const summary = statsSummaryForAi(stats);
+    const analysis = await analyzeAudience(summary, days);
+    await logAction({ type: "analysis.run", actor: "ai", title: `Analyse IA sur ${days} jours` });
+    // L'analyse nourrit aussi la mémoire (apprentissages durables)
+    const learningsAdded = await refreshLearnings(summary).catch(() => 0);
+    return NextResponse.json({ analysis, days, learningsAdded });
   } catch (err) {
     console.error("Erreur d'analyse IA :", err);
     return NextResponse.json(

@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { aiEnabled, generateMarketingPost } from "@/lib/ai";
 import { computeStats, statsSummaryForAi } from "@/lib/stats";
-import { uniquePostSlug } from "@/lib/posts";
+import { createPost } from "@/lib/posts";
+import { topLearnings } from "@/lib/learnings";
+import { assetUrl } from "@/lib/engine";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60; // la génération Opus peut prendre >10 s
+export const maxDuration = 60;
 
 /**
- * Génère un brouillon de post marketing avec Claude.
- * Body : { brief?: string, qrCodeId?: string, useStats?: boolean }
+ * Génère un brouillon de post marketing avec Claude, en appliquant les
+ * apprentissages accumulés. Body : { brief?, qrCodeId?, campaignId?, useStats? }
  */
 export async function POST(req: NextRequest) {
   if (!aiEnabled()) {
@@ -25,44 +27,51 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
     brief?: string;
     qrCodeId?: string;
+    campaignId?: string;
     useStats?: boolean;
   };
 
-  const qr = body.qrCodeId
-    ? await prisma.qrCode.findUnique({ where: { id: body.qrCodeId } })
-    : null;
+  const [qr, campaign] = await Promise.all([
+    body.qrCodeId
+      ? prisma.qrCode.findUnique({ where: { id: body.qrCodeId } })
+      : Promise.resolve(null),
+    body.campaignId
+      ? prisma.campaign.findUnique({ where: { id: body.campaignId } })
+      : Promise.resolve(null),
+  ]);
 
-  const [existingPosts, statsSummary] = await Promise.all([
+  const [existingPosts, statsSummary, learnings] = await Promise.all([
     prisma.post.findMany({ select: { title: true }, orderBy: { createdAt: "desc" }, take: 10 }),
     body.useStats !== false
       ? computeStats(undefined, 30).then(statsSummaryForAi)
       : Promise.resolve(undefined),
+    topLearnings(),
   ]);
 
   const origin = process.env.APP_BASE_URL || req.nextUrl.origin;
-  const trackedUrl = qr
-    ? `${origin}/${qr.type === "link" ? "l" : "r"}/${qr.slug}`
-    : `${origin}/download`;
+  const trackedUrl = assetUrl(origin, qr);
+  const resolvedCampaignId = campaign?.id ?? qr?.campaignId ?? null;
 
   try {
     const generated = await generateMarketingPost({
       brief: body.brief?.trim() || undefined,
-      campaignName: qr?.name,
+      campaignName: campaign?.name ?? qr?.name,
+      campaignObjective: campaign?.objective ?? undefined,
       trackedUrl,
       statsSummary,
       existingTitles: existingPosts.map((p) => p.title),
+      learnings,
     });
 
-    const post = await prisma.post.create({
-      data: {
-        title: generated.title,
-        slug: await uniquePostSlug(generated.slug),
-        excerpt: generated.excerpt,
-        content: generated.content,
-        hashtags: generated.hashtags.join(" "),
-        aiGenerated: true,
-        qrCodeId: qr?.id ?? null,
-      },
+    const post = await createPost({
+      title: generated.title,
+      slug: generated.slug,
+      excerpt: generated.excerpt,
+      content: generated.content,
+      hashtags: generated.hashtags.join(" "),
+      qrCodeId: qr?.id ?? null,
+      campaignId: resolvedCampaignId,
+      aiGenerated: true,
     });
     return NextResponse.json(post, { status: 201 });
   } catch (err) {

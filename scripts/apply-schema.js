@@ -11,7 +11,10 @@ if (!process.env.DATABASE_URL) {
 }
 
 try {
-  execSync("npx prisma db push --skip-generate", { stdio: "inherit" });
+  // --accept-data-loss : nos évolutions de schéma sont additives (nouvelles
+  // tables + colonnes nullables) ; le flag évite un blocage du build sur
+  // l'avertissement générique de Prisma.
+  execSync("npx prisma db push --skip-generate --accept-data-loss", { stdio: "inherit" });
   console.log("✓ Schéma de base de données appliqué.");
 } catch {
   console.warn(

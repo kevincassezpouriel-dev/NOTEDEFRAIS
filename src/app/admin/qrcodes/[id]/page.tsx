@@ -12,6 +12,7 @@ interface QrDetail {
   slug: string;
   type: string;
   channel: string | null;
+  campaignId: string | null;
   appStoreUrl: string;
   playStoreUrl: string;
   fallbackUrl: string;
@@ -19,6 +20,11 @@ interface QrDetail {
   active: boolean;
   totalScans: number;
   totalConversions: number;
+}
+
+interface CampaignOption {
+  id: string;
+  name: string;
 }
 
 /** Redimensionne le logo en ≤ 512 px et le convertit en data-URL PNG. */
@@ -48,12 +54,17 @@ export default function QrDetailPage({ params }: { params: Promise<{ id: string 
   const { id } = use(params);
   const router = useRouter();
   const [qr, setQr] = useState<QrDetail | null>(null);
+  const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/admin/qrcodes/${id}`, { cache: "no-store" });
+    const [res, campRes] = await Promise.all([
+      fetch(`/api/admin/qrcodes/${id}`, { cache: "no-store" }),
+      fetch("/api/admin/campaigns", { cache: "no-store" }),
+    ]);
     if (res.ok) setQr(await res.json());
+    if (campRes.ok) setCampaigns(await campRes.json());
   }, [id]);
 
   useEffect(() => {
@@ -84,6 +95,7 @@ export default function QrDetailPage({ params }: { params: Promise<{ id: string 
     await patch({
       name: qr.name,
       channel: qr.channel,
+      campaignId: qr.campaignId,
       appStoreUrl: qr.appStoreUrl,
       playStoreUrl: qr.playStoreUrl,
       fallbackUrl: qr.fallbackUrl,
@@ -160,6 +172,26 @@ export default function QrDetailPage({ params }: { params: Promise<{ id: string 
               />
             </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1" htmlFor="f-campaign">
+              Campagne
+            </label>
+            <select
+              id="f-campaign"
+              className="input"
+              value={qr.campaignId ?? ""}
+              onChange={(e) => setQr({ ...qr, campaignId: e.target.value || null })}
+            >
+              <option value="">Aucune</option>
+              {campaigns.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="block text-xs font-medium mb-1" htmlFor="f-appstore">
               Lien App Store (iPhone / iPad)

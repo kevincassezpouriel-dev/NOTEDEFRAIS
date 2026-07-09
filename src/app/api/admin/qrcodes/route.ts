@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { slugify, validateSlug, validateUrls } from "@/lib/validate";
+import { logAction } from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const qrcodes = await prisma.qrCode.findMany({
     orderBy: { createdAt: "asc" },
-    include: { _count: { select: { scans: true, conversions: true } } },
+    include: {
+      _count: { select: { scans: true, conversions: true } },
+      campaign: { select: { id: true, name: true } },
+    },
   });
   return NextResponse.json(
     qrcodes.map(({ _count, logo, ...qr }) => ({
@@ -25,6 +29,7 @@ export async function POST(req: NextRequest) {
     slug?: string;
     type?: string;
     channel?: string;
+    campaignId?: string;
     appStoreUrl?: string;
     playStoreUrl?: string;
     fallbackUrl?: string;
@@ -49,10 +54,18 @@ export async function POST(req: NextRequest) {
       slug,
       type: body.type === "link" ? "link" : "qr",
       channel: body.channel?.trim() || null,
+      campaignId: body.campaignId || null,
       appStoreUrl: body.appStoreUrl?.trim() ?? "",
       playStoreUrl: body.playStoreUrl?.trim() ?? "",
       fallbackUrl: body.fallbackUrl?.trim() ?? "",
     },
+  });
+  await logAction({
+    type: "asset.created",
+    title: `${qr.type === "link" ? "Lien" : "QR code"} créé : « ${qr.name} »`,
+    campaignId: qr.campaignId,
+    refType: "qr",
+    refId: qr.id,
   });
   return NextResponse.json(qr, { status: 201 });
 }

@@ -15,18 +15,29 @@ interface QrRow {
   totalConversions: number;
 }
 
+interface CampaignOption {
+  id: string;
+  name: string;
+}
+
 export default function QrCodesPage() {
   const [qrcodes, setQrcodes] = useState<QrRow[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [type, setType] = useState<"qr" | "link">("qr");
   const [channel, setChannel] = useState("");
+  const [campaignId, setCampaignId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/admin/qrcodes", { cache: "no-store" });
+    const [res, campRes] = await Promise.all([
+      fetch("/api/admin/qrcodes", { cache: "no-store" }),
+      fetch("/api/admin/campaigns", { cache: "no-store" }),
+    ]);
     if (res.ok) setQrcodes(await res.json());
+    if (campRes.ok) setCampaigns(await campRes.json());
   }, []);
 
   useEffect(() => {
@@ -45,6 +56,7 @@ export default function QrCodesPage() {
         slug: slug || undefined,
         type,
         channel: channel || undefined,
+        campaignId: campaignId || undefined,
       }),
     });
     setCreating(false);
@@ -116,6 +128,26 @@ export default function QrCodesPage() {
             pattern="[a-z0-9]+(-[a-z0-9]+)*"
           />
         </div>
+        {campaigns.length > 0 && (
+          <div className="w-48">
+            <label className="block text-xs font-medium mb-1" htmlFor="qr-campaign">
+              Campagne (optionnel)
+            </label>
+            <select
+              id="qr-campaign"
+              className="input"
+              value={campaignId}
+              onChange={(e) => setCampaignId(e.target.value)}
+            >
+              <option value="">Aucune</option>
+              {campaigns.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <button type="submit" className="btn btn-primary" disabled={creating}>
           {creating ? "Création…" : "+ Créer"}
         </button>

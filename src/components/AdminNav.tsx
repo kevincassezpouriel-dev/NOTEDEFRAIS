@@ -5,8 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 
 const LINKS = [
   { href: "/admin", label: "Tableau de bord" },
+  { href: "/admin/campaigns", label: "Campagnes" },
   { href: "/admin/qrcodes", label: "QR & liens" },
   { href: "/admin/posts", label: "Posts" },
+  { href: "/admin/reglages", label: "Réglages" },
   { href: "/admin/rgpd", label: "RGPD" },
 ];
 

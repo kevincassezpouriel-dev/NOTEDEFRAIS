@@ -18,6 +18,9 @@ const CORS = {
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get("qr");
   const platform = req.nextUrl.searchParams.get("platform");
+  // source = utm_source transmis par l'app (Install Referrer Android) →
+  // attribution de l'installation à un post/canal précis.
+  const source = req.nextUrl.searchParams.get("source");
   if (!slug) {
     return NextResponse.json({ error: "Paramètre qr manquant" }, { status: 400, headers: CORS });
   }
@@ -29,6 +32,7 @@ export async function GET(req: NextRequest) {
     data: {
       qrCodeId: qr.id,
       platform: platform === "ios" || platform === "android" ? platform : null,
+      source: source?.slice(0, 100) || null,
     },
   });
   return new NextResponse(null, { status: 204, headers: CORS });

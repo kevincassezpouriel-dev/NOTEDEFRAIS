@@ -29,9 +29,11 @@ export default async function PostPage({ params }: Props) {
   });
   if (!post || post.status !== "published") notFound();
 
+  // Attribution par post : la source = utm_source unique du post
+  const src = post.utmSource ?? "site-news";
   const ctaHref = post.qrCode
-    ? `/${post.qrCode.type === "link" ? "l" : "r"}/${post.qrCode.slug}?utm_source=site-news`
-    : "/download?utm_source=site-news";
+    ? `/${post.qrCode.type === "link" ? "l" : "r"}/${post.qrCode.slug}?utm_source=${src}`
+    : `/download?utm_source=${src}`;
 
   return (
     <main className="min-h-screen p-6 sm:p-10">

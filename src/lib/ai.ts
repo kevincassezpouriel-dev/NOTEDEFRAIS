@@ -64,8 +64,10 @@ export async function generateMarketingPost(opts: {
   brief?: string;
   statsSummary?: string;
   campaignName?: string;
+  campaignObjective?: string;
   trackedUrl?: string;
   existingTitles?: string[];
+  learnings?: string[];
 }): Promise<GeneratedPost> {
   const parts: string[] = [];
   if (opts.brief) {
@@ -75,7 +77,16 @@ export async function generateMarketingPost(opts: {
       "Écris un post de promotion de l'application MINGGLE. Choisis toi-même un angle original (usage concret, coulisses, astuce, témoignage fictif crédible…)."
     );
   }
-  if (opts.campaignName) parts.push(`Campagne associée : ${opts.campaignName}`);
+  if (opts.campaignName) {
+    parts.push(
+      `Campagne associée : ${opts.campaignName}${opts.campaignObjective ? ` — objectif : ${opts.campaignObjective}` : ""}`
+    );
+  }
+  if (opts.learnings?.length) {
+    parts.push(
+      `Ce que tu as appris des performances passées (APPLIQUE ces leçons) :\n- ${opts.learnings.join("\n- ")}`
+    );
+  }
   if (opts.trackedUrl) {
     parts.push(
       `Intègre naturellement ce lien de téléchargement dans le contenu (c'est un lien tracké) : ${opts.trackedUrl}`
@@ -142,4 +153,80 @@ pour conclure, dis-le honnêtement et recommande quoi mesurer.`,
     throw new Error("L'analyse a été refusée par le modèle.");
   }
   return response.content.find((b) => b.type === "text")?.text ?? "";
+}
+
+const LEARNINGS_SCHEMA = {
+  type: "object" as const,
+  properties: {
+    learnings: {
+      type: "array" as const,
+      items: {
+        type: "object" as const,
+        properties: {
+          insight: {
+            type: "string" as const,
+            description: "Leçon durable et actionnable, en une phrase (ex. « les scans du soir convertissent mieux »)",
+          },
+          evidence: { type: "string" as const, description: "La donnée chiffrée qui la fonde" },
+          weight: {
+            type: "integer" as const,
+            description: "Importance de 1 (mineure) à 5 (majeure, à toujours garder en tête)",
+          },
+        },
+        required: ["insight", "evidence", "weight"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["learnings"],
+  additionalProperties: false,
+};
+
+export interface ExtractedLearning {
+  insight: string;
+  evidence: string;
+  weight: number;
+}
+
+/**
+ * Extrait des apprentissages DURABLES des statistiques (ce qui restera vrai
+ * la semaine prochaine). Alimente la mémoire de l'autopilote.
+ */
+export async function extractLearnings(
+  statsJson: string,
+  knownInsights: string[]
+): Promise<ExtractedLearning[]> {
+  const response = await client().messages.create({
+    model: MODEL,
+    max_tokens: 8000,
+    thinking: { type: "adaptive" },
+    system: `Tu es analyste growth pour MINGGLE. À partir des statistiques, dégage
+uniquement des ENSEIGNEMENTS DURABLES et actionnables — pas des observations
+ponctuelles. Chaque leçon doit pouvoir guider la création des prochains posts
+ou le choix des canaux. Ignore le bruit statistique (< 10 événements).
+Ne répète PAS un enseignement déjà connu. S'il n'y a rien de solide à
+conclure, renvoie une liste vide.`,
+    output_config: { format: { type: "json_schema", schema: LEARNINGS_SCHEMA } },
+    messages: [
+      {
+        role: "user",
+        content: `Enseignements déjà connus (ne pas répéter) :\n${
+          knownInsights.length ? "- " + knownInsights.join("\n- ") : "(aucun)"
+        }\n\nStatistiques :\n${statsJson}`,
+      },
+    ],
+  });
+
+  if (response.stop_reason === "refusal") return [];
+  const text = response.content.find((b) => b.type === "text")?.text ?? "{}";
+  try {
+    const parsed = JSON.parse(text) as { learnings?: ExtractedLearning[] };
+    return (parsed.learnings ?? []).map((l) => ({
+      insight: l.insight,
+      evidence: l.evidence,
+      weight: Math.min(Math.max(Math.round(l.weight) || 1, 1), 5),
+    }));
+  } catch {
+    return [];
+  }
 }

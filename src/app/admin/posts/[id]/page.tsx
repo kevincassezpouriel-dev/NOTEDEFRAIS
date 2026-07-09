@@ -14,9 +14,10 @@ interface PostDetail {
   status: string;
   aiGenerated: boolean;
   qrCodeId: string | null;
+  campaignId: string | null;
 }
 
-interface QrOption {
+interface Option {
   id: string;
   name: string;
 }
@@ -25,24 +26,28 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
   const { id } = use(params);
   const router = useRouter();
   const [post, setPost] = useState<PostDetail | null>(null);
-  const [qrcodes, setQrcodes] = useState<QrOption[]>([]);
+  const [qrcodes, setQrcodes] = useState<Option[]>([]);
+  const [campaigns, setCampaigns] = useState<Option[]>([]);
+  const [scheduledAt, setScheduledAt] = useState("");
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [postRes, qrRes] = await Promise.all([
+    const [postRes, qrRes, campRes] = await Promise.all([
       fetch(`/api/admin/posts/${id}`, { cache: "no-store" }),
       fetch("/api/admin/qrcodes", { cache: "no-store" }),
+      fetch("/api/admin/campaigns", { cache: "no-store" }),
     ]);
     if (postRes.ok) setPost(await postRes.json());
     if (qrRes.ok) setQrcodes(await qrRes.json());
+    if (campRes.ok) setCampaigns(await campRes.json());
   }, [id]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  async function patch(data: Partial<PostDetail>, successMessage: string) {
+  async function patch(data: Record<string, unknown>, successMessage: string) {
     setBusy(true);
     setMessage(null);
     const res = await fetch(`/api/admin/posts/${id}`, {
@@ -70,6 +75,7 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
         excerpt: post.excerpt,
         hashtags: post.hashtags,
         qrCodeId: post.qrCodeId,
+        campaignId: post.campaignId,
       },
       "✓ Enregistré."
     );
@@ -154,7 +160,7 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
           </div>
           <div className="flex-1 min-w-48">
             <label className="block text-xs font-medium mb-1" htmlFor="p-qr">
-              Campagne liée (lien tracké du bouton « Télécharger »)
+              Asset lié (bouton « Télécharger » tracké)
             </label>
             <select
               id="p-qr"
@@ -162,10 +168,28 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
               value={post.qrCodeId ?? ""}
               onChange={(e) => setPost({ ...post, qrCodeId: e.target.value || null })}
             >
-              <option value="">Aucune (QR principal)</option>
+              <option value="">Aucun (QR principal)</option>
               {qrcodes.map((qr) => (
                 <option key={qr.id} value={qr.id}>
                   {qr.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 min-w-48">
+            <label className="block text-xs font-medium mb-1" htmlFor="p-campaign">
+              Campagne
+            </label>
+            <select
+              id="p-campaign"
+              className="input"
+              value={post.campaignId ?? ""}
+              onChange={(e) => setPost({ ...post, campaignId: e.target.value || null })}
+            >
+              <option value="">Aucune</option>
+              {campaigns.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </select>
@@ -189,7 +213,7 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
               disabled={busy}
               onClick={() =>
                 patch(
-                  { status: "published", title: post.title, content: post.content, excerpt: post.excerpt, hashtags: post.hashtags, qrCodeId: post.qrCodeId },
+                  { status: "published", title: post.title, content: post.content, excerpt: post.excerpt, hashtags: post.hashtags, qrCodeId: post.qrCodeId, campaignId: post.campaignId },
                   "✓ Publié sur /news — webhook réseaux sociaux notifié (si configuré)."
                 )
               }
@@ -210,6 +234,40 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
             Supprimer
           </button>
         </div>
+
+        {/* Programmation (calendrier éditorial) */}
+        {post.status !== "published" && (
+          <div className="border-t pt-4" style={{ borderColor: "var(--grid)" }}>
+            <label className="block text-xs font-medium mb-1" htmlFor="p-sched">
+              🗓️ Programmer la publication (au lieu de publier tout de suite)
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                id="p-sched"
+                type="datetime-local"
+                className="input !w-auto"
+                value={scheduledAt}
+                onChange={(e) => setScheduledAt(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={busy || !scheduledAt}
+                onClick={() =>
+                  patch(
+                    { status: "scheduled", scheduledAt: new Date(scheduledAt).toISOString() },
+                    "🗓️ Programmé — le cron publiera à l'heure dite."
+                  )
+                }
+              >
+                Programmer
+              </button>
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                (le cron doit être actif ; voir Réglages)
+              </span>
+            </div>
+          </div>
+        )}
       </form>
     </div>
   );
