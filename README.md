@@ -277,6 +277,8 @@ comparaison des campagnes.
 | `DASHBOARD_TZ` | non | Fuseau du tableau de bord (défaut `Europe/Paris`) |
 | `ANTHROPIC_API_KEY` | non | Active la génération de posts et l'analyse IA (console.anthropic.com) |
 | `AI_MODEL` | non | Modèle Claude (défaut `claude-opus-4-8`) |
+| `IMAGE_API_KEY` | non | Active la génération de **vraies images** par IA (bouton « ✨ Générer une image ») — fournisseur compatible OpenAI Images |
+| `IMAGE_API_URL` / `IMAGE_API_MODEL` / `IMAGE_API_SIZE` | non | Endpoint / modèle / taille du fournisseur d'images (défauts OpenAI Images) |
 | `SOCIAL_WEBHOOK_URL` | non | Webhook Zapier/Make/Buffer appelé à chaque publication de post |
 | `AUTOPILOT` | non | `1` = post hebdomadaire 100 % automatique (cron Vercel) |
 | `CRON_SECRET` | non | Protège l'endpoint `/api/cron/autopilot` |

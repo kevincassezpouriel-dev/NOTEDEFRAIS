@@ -297,6 +297,33 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
                     }
                   }}
                 />
+                <button
+                  type="button"
+                  className="btn btn-secondary !py-1 text-xs"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    setMessage(null);
+                    const res = await fetch("/api/admin/ai/image", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ postId: id, angle: visual.headline }),
+                    });
+                    setBusy(false);
+                    if (res.ok) {
+                      const p = (await res.json()) as PostDetail;
+                      setPost(p);
+                      setVisual(parseVisual(p.visual, p.title, p.slug));
+                      setVisualVersion((v) => v + 1);
+                      setMessage({ text: "✓ Image générée par IA et posée en fond.", error: false });
+                    } else {
+                      const b = await res.json().catch(() => null);
+                      setMessage({ text: b?.error ?? "Échec de la génération d'image", error: true });
+                    }
+                  }}
+                >
+                  ✨ Générer une image (IA)
+                </button>
                 {visual.bgImage && (
                   <button
                     type="button"
