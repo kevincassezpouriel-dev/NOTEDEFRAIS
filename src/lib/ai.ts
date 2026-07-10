@@ -139,7 +139,7 @@ export async function generateMarketingPost(opts: {
     parts.push(`Brief du post à écrire :\n${opts.brief}`);
   } else {
     parts.push(
-      "Écris un post de promotion de l'application MINGGLE. Choisis toi-même un angle original (usage concret, coulisses, astuce, témoignage fictif crédible…)."
+      "Écris un post de promotion de l'application. Choisis toi-même un angle original dans les piliers de la marque (astuce, coulisses, témoignage fictif crédible, mise en situation…)."
     );
   }
   if (opts.campaignName) {

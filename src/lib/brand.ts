@@ -28,22 +28,27 @@ export interface BrandIdentity {
 }
 
 export const DEFAULT_BRAND: BrandIdentity = {
-  name: "MINGGLE",
-  tagline: "L'app qui vous rapproche.",
+  name: "Minggle",
+  tagline: "La colocation sans les complications.",
   description:
-    "MINGGLE est une application mobile disponible sur iOS et Android. Simple, rapide et gratuite.",
+    "Minggle est la première application française de colocation affinitaire, boostée par l'IA. Elle matche des colocataires vraiment compatibles (personnalité, rythme de vie, budget, valeurs), avec des profils vérifiés et des logements partenaires fiables. On trouve son coloc avant même de chercher l'appart.",
   tone:
-    "Moderne, direct, enthousiaste. Phrases courtes. Jamais ampoulé ni robotique. Un appel à l'action clair dans chaque post.",
-  audience: "Grand public francophone, 18-45 ans, utilisateurs mobiles.",
-  pillars: "Astuces d'utilisation\nNouveautés de l'app\nCoulisses et vision\nTémoignages d'usage",
+    "Jeune, direct, chaleureux et rassurant. TUTOIEMENT systématique (\"toi\", \"ton coloc\", \"tu matches\"). Phrases courtes et énergiques. On parle vrai, on dédramatise les galères de la coloc. Un appel à l'action clair dans chaque post.",
+  audience:
+    "Étudiants, jeunes actifs, Erasmus et freelances (18-30 ans) en recherche de colocation en France (Paris, Lyon, Bordeaux, Toulouse, Lille…).",
+  pillars:
+    "Trouver le bon coloc grâce au matching IA (colocation affinitaire)\nProfils vérifiés, zéro mauvaise surprise\nCompatibilité : rythme de vie, valeurs, budget, habitudes\nLogements partenaires vérifiés, cherchés à plusieurs\nTémoignages et matchs réussis",
   avoid:
-    "Superlatifs creux (révolutionnaire, incroyable)\nJargon technique\nPromesses non tenables\nSujets politiques ou polémiques\nComparaisons dénigrantes avec des concurrents",
-  vocabulary: "rejoindre\nse retrouver\nen un instant\nensemble",
-  emojiPolicy: "Un ou deux emojis maximum par post, pertinents — jamais de rangées d'emojis.",
-  ctaExamples: "Téléchargez MINGGLE\nRejoignez la communauté\nEssayez gratuitement",
-  colorPrimary: "#2a78d6",
-  colorSecondary: "#1baf7a",
-  colorDark: "#0d1b2e",
+    "Le VOUVOIEMENT (on tutoie toujours)\nSuperlatifs creux (révolutionnaire, incroyable)\nJargon technique\nPromesses non tenables (« coloc garantie »)\nCiter ou dénigrer nommément des concurrents (Leboncoin, SeLoger…)\nSujets politiques ou polémiques",
+  vocabulary:
+    "coloc\ncolocataire\nmatcher / un match\ncolocation affinitaire\ncompatibilité\nprofil vérifié\nta vibe\nton chez-soi\nboostée par l'IA",
+  emojiPolicy:
+    "Un emoji pertinent de temps en temps (🚀 🏡 🧩 ✨), jamais de rangées d'emojis.",
+  ctaExamples:
+    "Trouve ton coloc\nInstalle Minggle\nCrée ton profil en 3 minutes\nTrouve ta coloc idéale",
+  colorPrimary: "#5b6ef5",
+  colorSecondary: "#f0576d",
+  colorDark: "#1e2749",
   typography: "moderne",
   logo: null,
 };
