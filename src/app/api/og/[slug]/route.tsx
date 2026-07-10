@@ -8,14 +8,12 @@ import type { BrandIdentity } from "@/lib/brand";
 export const dynamic = "force-dynamic";
 
 /**
- * Moteur de composition visuelle : rend l'image de marque d'un post
- * (spec visuelle décidée par l'IA ou éditée dans l'admin) aux couleurs de
- * l'identité — palette verrouillée, gabarits fixes, zéro divergence.
+ * Moteur de composition visuelle : rend le visuel de marque d'un post
+ * (spec visuelle décidée par l'IA ou éditée dans l'admin) aux couleurs, au
+ * logo et à la typographie de l'identité — charte verrouillée, zéro divergence.
  *
- *   /api/og/{slug}            → 1200×630 (partages Facebook/LinkedIn/X, og:image)
+ *   /api/og/{slug}              → 1200×630 (partages, og:image)
  *   /api/og/{slug}?format=carre → 1080×1080 (Instagram)
- *
- * Endpoint public : les scrapers des réseaux doivent pouvoir le lire.
  */
 export async function GET(
   req: NextRequest,
@@ -28,7 +26,7 @@ export async function GET(
 
   const post = await prisma.post.findUnique({
     where: { slug },
-    select: { title: true, visual: true, status: true },
+    select: { title: true, visual: true },
   });
   if (!post) return new Response("Introuvable", { status: 404 });
 
@@ -42,43 +40,139 @@ export async function GET(
   });
 }
 
-// La typographie choisie dans l'identité pilote graisse / casse / interlettrage
-// des titres du visuel (rendu robuste, sans police externe à charger).
+/* ---------- utilitaires couleur ---------- */
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+function rgba(hex: string, a: number): string {
+  const [r, g, b] = hexToRgb(hex);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function mix(a: string, b: string, t: number): string {
+  const [r1, g1, b1] = hexToRgb(a);
+  const [r2, g2, b2] = hexToRgb(b);
+  const to = (x: number, y: number) => Math.round(x + (y - x) * t);
+  const h = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${h(to(r1, r2))}${h(to(g1, g2))}${h(to(b1, b2))}`;
+}
+function luminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
+// La typographie choisie pilote graisse / casse / interlettrage des titres.
 const TYPO: Record<
   BrandIdentity["typography"],
   { weight: number; spacing: number; uppercase: boolean; lineHeight: number }
 > = {
-  moderne: { weight: 800, spacing: -0.5, uppercase: false, lineHeight: 1.08 },
-  impactful: { weight: 900, spacing: -1, uppercase: true, lineHeight: 1.0 },
-  elegant: { weight: 600, spacing: 0.3, uppercase: false, lineHeight: 1.2 },
-  technique: { weight: 700, spacing: 1.5, uppercase: true, lineHeight: 1.12 },
+  moderne: { weight: 800, spacing: -1.5, uppercase: false, lineHeight: 1.02 },
+  impactful: { weight: 900, spacing: -2, uppercase: true, lineHeight: 0.98 },
+  elegant: { weight: 600, spacing: -0.2, uppercase: false, lineHeight: 1.12 },
+  technique: { weight: 800, spacing: 2, uppercase: true, lineHeight: 1.05 },
 };
 
 function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
   const accent = v.accent === "secondaire" ? brand.colorSecondary : brand.colorPrimary;
+  const accent2 = v.accent === "secondaire" ? brand.colorPrimary : brand.colorSecondary;
   const dark = v.mode === "sombre";
-  const bg = dark ? brand.colorDark : "#faf9f6";
-  const ink = dark ? "#ffffff" : "#101418";
-  const sub = dark ? "rgba(255,255,255,0.72)" : "rgba(16,20,24,0.65)";
-  const pad = Math.round(w * 0.075);
+
+  // Fond dégradé subtil, teinté vers l'accent — jamais plat.
+  const baseDark = luminance(brand.colorDark) < 0.5 ? brand.colorDark : "#0d1b2e";
+  const bg = dark
+    ? `linear-gradient(140deg, ${mix(baseDark, "#000000", 0.15)} 0%, ${baseDark} 45%, ${mix(baseDark, accent, 0.22)} 100%)`
+    : `linear-gradient(140deg, #ffffff 0%, ${mix("#ffffff", accent, 0.05)} 55%, ${mix("#ffffff", accent, 0.11)} 100%)`;
+  const ink = dark ? "#ffffff" : "#0f1720";
+  const sub = dark ? "rgba(255,255,255,0.66)" : "rgba(15,23,32,0.6)";
+  const pad = Math.round(w * 0.078);
   const typo = TYPO[brand.typography] ?? TYPO.moderne;
-  const headlineSize = v.headline.length > 46 ? w * 0.055 : v.headline.length > 26 ? w * 0.068 : w * 0.082;
   const cs = (t: string) => (typo.uppercase ? t.toUpperCase() : t);
+
+  const hlen = v.headline.length;
+  const headlineSize = hlen > 52 ? w * 0.058 : hlen > 32 ? w * 0.072 : w * 0.088;
   const headStyle = {
     fontWeight: typo.weight,
     letterSpacing: typo.spacing,
     lineHeight: typo.lineHeight,
   };
 
+  // Halo lumineux (radial) — donne de la profondeur.
+  const glow = (
+    <div
+      style={{
+        position: "absolute",
+        top: -h * 0.35,
+        right: -h * 0.2,
+        width: h * 1.1,
+        height: h * 1.1,
+        borderRadius: 9999,
+        background: `radial-gradient(circle, ${rgba(accent, dark ? 0.38 : 0.22)} 0%, ${rgba(accent, 0)} 62%)`,
+        display: "flex",
+      }}
+    />
+  );
+  const glow2 = (
+    <div
+      style={{
+        position: "absolute",
+        bottom: -h * 0.4,
+        left: -h * 0.3,
+        width: h * 0.95,
+        height: h * 0.95,
+        borderRadius: 9999,
+        background: `radial-gradient(circle, ${rgba(accent2, dark ? 0.2 : 0.12)} 0%, ${rgba(accent2, 0)} 60%)`,
+        display: "flex",
+      }}
+    />
+  );
+
+  // Barre d'accent verticale à gauche (structure).
+  const bar = (
+    <div
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: Math.round(w * 0.012),
+        background: `linear-gradient(180deg, ${accent} 0%, ${accent2} 100%)`,
+        display: "flex",
+      }}
+    />
+  );
+
+  const logoBox = brand.logo ? (
+    <div
+      style={{
+        width: w * 0.05,
+        height: w * 0.05,
+        borderRadius: 12,
+        background: "#ffffff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        border: `1px solid ${rgba(ink, 0.08)}`,
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={brand.logo} alt="" width={w * 0.04} height={w * 0.04} style={{ objectFit: "contain" }} />
+    </div>
+  ) : (
+    <div
+      style={{
+        width: w * 0.03,
+        height: w * 0.03,
+        borderRadius: 9,
+        background: `linear-gradient(135deg, ${accent}, ${accent2})`,
+        display: "flex",
+      }}
+    />
+  );
+
   const wordmark = (
-    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-      {brand.logo ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={brand.logo} alt="" width={40} height={40} style={{ borderRadius: 8 }} />
-      ) : (
-        <div style={{ width: 26, height: 26, background: accent, borderRadius: 7, display: "flex" }} />
-      )}
-      <div style={{ display: "flex", fontSize: w * 0.026, fontWeight: 700, color: ink, letterSpacing: 2 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      {logoBox}
+      <div style={{ display: "flex", fontSize: w * 0.028, fontWeight: 800, color: ink, letterSpacing: 1 }}>
         {brand.name.toUpperCase()}
       </div>
     </div>
@@ -86,81 +180,76 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
 
   const footer = (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-      <div style={{ display: "flex", fontSize: w * 0.019, color: sub }}>{brand.tagline}</div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <div style={{ width: 44, height: 8, background: accent, borderRadius: 4, display: "flex" }} />
-        <div style={{ width: 16, height: 8, background: sub, borderRadius: 4, display: "flex", opacity: 0.5 }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 30, height: 4, borderRadius: 3, background: accent, display: "flex" }} />
+        <div style={{ display: "flex", fontSize: w * 0.021, color: sub, fontWeight: 500 }}>{brand.tagline}</div>
+      </div>
+      <div style={{ display: "flex", fontSize: w * 0.019, color: sub, fontWeight: 600, letterSpacing: 1 }}>
+        iOS · ANDROID
       </div>
     </div>
   );
 
-  // Décor géométrique de marque (jamais d'images externes : fiable partout)
-  const decor = (
+  const eyebrow = (label: string) => (
     <div
       style={{
-        position: "absolute",
-        right: -h * 0.22,
-        top: -h * 0.22,
-        width: h * 0.62,
-        height: h * 0.62,
-        borderRadius: 9999,
-        background: accent,
-        opacity: dark ? 0.22 : 0.14,
         display: "flex",
+        alignSelf: "flex-start",
+        alignItems: "center",
+        gap: 10,
+        background: dark ? rgba(accent, 0.16) : rgba(accent, 0.12),
+        border: `1px solid ${rgba(accent, dark ? 0.4 : 0.3)}`,
+        color: dark ? mix(accent, "#ffffff", 0.35) : accent,
+        fontSize: w * 0.02,
+        fontWeight: 800,
+        letterSpacing: 2.5,
+        padding: `${w * 0.01}px ${w * 0.022}px`,
+        borderRadius: 999,
       }}
-    />
-  );
-  const decor2 = (
-    <div
-      style={{
-        position: "absolute",
-        right: h * 0.1,
-        top: h * 0.14,
-        width: h * 0.16,
-        height: h * 0.16,
-        borderRadius: 9999,
-        border: `6px solid ${accent}`,
-        opacity: dark ? 0.5 : 0.35,
-        display: "flex",
-      }}
-    />
+    >
+      {label}
+    </div>
   );
 
   let body;
   if (v.template === "astuce") {
     body = (
-      <div style={{ display: "flex", flexDirection: "column", gap: 26, maxWidth: "88%" }}>
-        <div
-          style={{
-            display: "flex",
-            alignSelf: "flex-start",
-            background: accent,
-            color: "#ffffff",
-            fontSize: w * 0.022,
-            fontWeight: 700,
-            letterSpacing: 3,
-            padding: "10px 22px",
-            borderRadius: 999,
-          }}
-        >
-          ASTUCE
-        </div>
-        <div style={{ display: "flex", fontSize: headlineSize, color: ink, ...headStyle }}>
-          {cs(v.headline)}
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: w * 0.022, maxWidth: "90%" }}>
+        {eyebrow("ASTUCE")}
+        <div style={{ display: "flex", fontSize: headlineSize, color: ink, ...headStyle }}>{cs(v.headline)}</div>
         {v.subline ? (
-          <div style={{ display: "flex", fontSize: w * 0.026, color: sub, lineHeight: 1.35 }}>{v.subline}</div>
+          <div style={{ display: "flex", fontSize: w * 0.027, color: sub, lineHeight: 1.35, fontWeight: 500 }}>
+            {v.subline}
+          </div>
         ) : null}
       </div>
     );
   } else if (v.template === "stat") {
     body = (
-      <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: "88%" }}>
-        <div style={{ display: "flex", fontSize: headlineSize * 1.5, fontWeight: 900, color: accent, lineHeight: 1 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: w * 0.012, maxWidth: "92%" }}>
+        <div
+          style={{
+            display: "flex",
+            fontSize: w * 0.2,
+            fontWeight: 900,
+            color: accent,
+            lineHeight: 0.92,
+            letterSpacing: -4,
+          }}
+        >
           {v.headline}
         </div>
         {v.subline ? (
-          <div style={{ display: "flex", fontSize: w * 0.032, fontWeight: 600, color: ink, lineHeight: 1.25 }}>
+          <div
+            style={{
+              display: "flex",
+              fontSize: w * 0.036,
+              fontWeight: 700,
+              color: ink,
+              lineHeight: 1.15,
+              maxWidth: "80%",
+            }}
+          >
             {v.subline}
           </div>
         ) : null}
@@ -168,27 +257,35 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
     );
   } else if (v.template === "citation") {
     body = (
-      <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: "86%" }}>
-        <div style={{ display: "flex", fontSize: w * 0.12, fontWeight: 800, color: accent, lineHeight: 0.6 }}>«</div>
-        <div style={{ display: "flex", fontSize: headlineSize * 0.92, color: ink, ...headStyle }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: w * 0.01, maxWidth: "88%" }}>
+        <div style={{ display: "flex", fontSize: w * 0.14, fontWeight: 900, color: accent, lineHeight: 0.5 }}>“</div>
+        <div style={{ display: "flex", fontSize: headlineSize * 0.9, color: ink, ...headStyle, lineHeight: 1.1 }}>
           {v.headline}
         </div>
         {v.subline ? (
-          <div style={{ display: "flex", fontSize: w * 0.024, color: sub }}>— {v.subline}</div>
+          <div style={{ display: "flex", fontSize: w * 0.024, color: sub, fontWeight: 600, marginTop: w * 0.01 }}>
+            — {v.subline}
+          </div>
         ) : null}
       </div>
     );
   } else {
-    // annonce
+    // annonce : eyebrow + gros titre + preuve sociale
     body = (
-      <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: "88%" }}>
-        <div style={{ display: "flex", width: 76, height: 12, background: accent, borderRadius: 6 }} />
-        <div style={{ display: "flex", fontSize: headlineSize, color: ink, ...headStyle }}>
-          {cs(v.headline)}
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: w * 0.02, maxWidth: "90%" }}>
+        {eyebrow("NOUVEAU")}
+        <div style={{ display: "flex", fontSize: headlineSize, color: ink, ...headStyle }}>{cs(v.headline)}</div>
         {v.subline ? (
-          <div style={{ display: "flex", fontSize: w * 0.027, color: sub, lineHeight: 1.35 }}>{v.subline}</div>
+          <div style={{ display: "flex", fontSize: w * 0.028, color: sub, lineHeight: 1.35, fontWeight: 500 }}>
+            {v.subline}
+          </div>
         ) : null}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: w * 0.008 }}>
+          <div style={{ display: "flex", fontSize: w * 0.026, color: accent }}>★★★★★</div>
+          <div style={{ display: "flex", fontSize: w * 0.019, color: sub, fontWeight: 600 }}>
+            Gratuit sur l&apos;App Store &amp; Google Play
+          </div>
+        </div>
       </div>
     );
   }
@@ -203,12 +300,14 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
         justifyContent: "space-between",
         background: bg,
         padding: pad,
+        paddingLeft: pad + w * 0.012,
         position: "relative",
         fontFamily: "sans-serif",
       }}
     >
-      {decor}
-      {decor2}
+      {glow}
+      {glow2}
+      {bar}
       {wordmark}
       {body}
       {footer}

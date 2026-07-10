@@ -10,7 +10,17 @@ import type { VisualSpec } from "./visual";
  * plateforme fonctionne normalement).
  */
 
-const MODEL = process.env.AI_MODEL || "claude-opus-4-8";
+/**
+ * Modèles par tâche (optimisation coût / qualité) :
+ * - ÉCRITURE (créatif) : Sonnet 5 par défaut — qualité quasi-Opus sur le
+ *   copywriting marketing, à ~40 % du prix de sortie d'Opus.
+ * - ANALYSE (mécanique : extraction d'apprentissages) : Haiku 4.5 — 5× moins
+ *   cher, largement suffisant pour de l'extraction structurée.
+ * Surchargeables via AI_MODEL_WRITE / AI_MODEL_ANALYZE, ou AI_MODEL pour tout.
+ */
+const MODEL_WRITE = process.env.AI_MODEL_WRITE || process.env.AI_MODEL || "claude-sonnet-5";
+const MODEL_ANALYZE =
+  process.env.AI_MODEL_ANALYZE || process.env.AI_MODEL || "claude-haiku-4-5";
 
 export function aiEnabled(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
@@ -20,6 +30,33 @@ let _client: Anthropic | null = null;
 function client(): Anthropic {
   if (!_client) _client = new Anthropic();
   return _client;
+}
+
+// Modèles « modernes » : supportent la réflexion adaptative + le paramètre
+// effort. Les autres (Haiku 4.5, Sonnet 4.5…) ne les acceptent pas → on
+// n'envoie ni thinking ni effort pour éviter une erreur API.
+function isModern(model: string): boolean {
+  return /(opus-4-[678]|sonnet-5|sonnet-4-6|fable-5|mythos-5)/.test(model);
+}
+
+type Effort = "low" | "medium" | "high";
+
+/** Assemble les options de requête adaptées au modèle (réflexion + effort +
+ *  format structuré), pour maîtriser la dépense en tokens de réflexion. */
+function reqOpts(
+  model: string,
+  effort: Effort,
+  schema?: Record<string, unknown>
+): Record<string, unknown> {
+  const outputConfig: Record<string, unknown> = {};
+  if (schema) outputConfig.format = { type: "json_schema", schema };
+  const opts: Record<string, unknown> = {};
+  if (isModern(model)) {
+    opts.thinking = { type: "adaptive" };
+    outputConfig.effort = effort;
+  }
+  if (Object.keys(outputConfig).length > 0) opts.output_config = outputConfig;
+  return opts;
 }
 
 const POST_SCHEMA = {
@@ -136,13 +173,16 @@ export async function generateMarketingPost(opts: {
 
   const brand = await getBrand();
   const response = await client().messages.create({
-    model: MODEL,
+    model: MODEL_WRITE,
     max_tokens: 16000,
-    thinking: { type: "adaptive" },
-    system: buildBrandSystem(brand),
-    output_config: { format: { type: "json_schema", schema: POST_SCHEMA } },
+    // Prompt de marque stable → mis en cache : les tokens du cadrage ne sont
+    // facturés qu'à ~10 % lors des générations suivantes.
+    system: [
+      { type: "text", text: buildBrandSystem(brand), cache_control: { type: "ephemeral" } },
+    ],
+    ...reqOpts(MODEL_WRITE, "medium", POST_SCHEMA),
     messages: [{ role: "user", content: parts.join("\n\n") }],
-  });
+  } as Anthropic.Messages.MessageCreateParamsNonStreaming);
 
   if (response.stop_reason === "refusal") {
     throw new Error("La génération a été refusée par le modèle.");
@@ -160,9 +200,9 @@ export async function generateMarketingPost(opts: {
 export async function analyzeAudience(statsJson: string, days: number): Promise<string> {
   const brand = await getBrand();
   const response = await client().messages.create({
-    model: MODEL,
-    max_tokens: 16000,
-    thinking: { type: "adaptive" },
+    model: MODEL_ANALYZE,
+    max_tokens: 4000,
+    ...reqOpts(MODEL_ANALYZE, "low"),
     system: `Tu es analyste growth marketing pour la marque ${brand.name} (application mobile).
 On te fournit les statistiques brutes des QR codes et liens de suivi
 (scans par jour, appareils, pays/villes, navigateurs dont in-app Instagram/
@@ -181,7 +221,7 @@ Objectif de la marque : faire croître ${brand.name} au plus grand nombre.`,
         content: `Voici les statistiques des ${days} derniers jours :\n\n${statsJson}`,
       },
     ],
-  });
+  } as Anthropic.Messages.MessageCreateParamsNonStreaming);
 
   if (response.stop_reason === "refusal") {
     throw new Error("L'analyse a été refusée par le modèle.");
@@ -231,16 +271,15 @@ export async function extractLearnings(
   knownInsights: string[]
 ): Promise<ExtractedLearning[]> {
   const response = await client().messages.create({
-    model: MODEL,
-    max_tokens: 8000,
-    thinking: { type: "adaptive" },
+    model: MODEL_ANALYZE,
+    max_tokens: 4000,
     system: `Tu es analyste growth pour MINGGLE. À partir des statistiques, dégage
 uniquement des ENSEIGNEMENTS DURABLES et actionnables — pas des observations
 ponctuelles. Chaque leçon doit pouvoir guider la création des prochains posts
 ou le choix des canaux. Ignore le bruit statistique (< 10 événements).
 Ne répète PAS un enseignement déjà connu. S'il n'y a rien de solide à
 conclure, renvoie une liste vide.`,
-    output_config: { format: { type: "json_schema", schema: LEARNINGS_SCHEMA } },
+    ...reqOpts(MODEL_ANALYZE, "low", LEARNINGS_SCHEMA),
     messages: [
       {
         role: "user",
@@ -249,7 +288,7 @@ conclure, renvoie une liste vide.`,
         }\n\nStatistiques :\n${statsJson}`,
       },
     ],
-  });
+  } as Anthropic.Messages.MessageCreateParamsNonStreaming);
 
   if (response.stop_reason === "refusal") return [];
   const text = response.content.find((b) => b.type === "text")?.text ?? "{}";
