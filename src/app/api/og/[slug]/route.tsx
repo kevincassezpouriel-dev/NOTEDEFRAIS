@@ -1,16 +1,19 @@
 import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getBrand } from "@/lib/brand";
-import { parseVisual, type VisualSpec } from "@/lib/visual";
+import { getBrand, accentPool } from "@/lib/brand";
+import { parseVisual, hashString, type VisualSpec, type BgStyle } from "@/lib/visual";
 import type { BrandIdentity } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Moteur de composition visuelle : rend le visuel de marque d'un post
- * (spec visuelle décidée par l'IA ou éditée dans l'admin) aux couleurs, au
- * logo et à la typographie de l'identité — charte verrouillée, zéro divergence.
+ * Moteur de composition visuelle : rend le visuel de marque d'un post.
+ * La charte (couleurs, logo, typo) est verrouillée, MAIS chaque post combine
+ * un gabarit, un style de fond procédural (dérivé du slug → toujours
+ * différent), une couleur d'accent piochée dans la palette et un mode. On peut
+ * aussi poser une vraie photo/meme en arrière-plan. Résultat : des visuels
+ * variés, jamais deux fois le même, tout en restant strictement dans la marque.
  *
  *   /api/og/{slug}              → 1200×630 (partages, og:image)
  *   /api/og/{slug}?format=carre → 1080×1080 (Instagram)
@@ -31,7 +34,7 @@ export async function GET(
   if (!post) return new Response("Introuvable", { status: 404 });
 
   const brand = await getBrand();
-  const visual = parseVisual(post.visual, post.title);
+  const visual = parseVisual(post.visual, post.title, slug);
 
   return new ImageResponse(render(visual, brand, width, height), {
     width,
@@ -61,10 +64,20 @@ function luminance(hex: string): number {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 }
 
+/** PRNG déterministe (Lehmer) — variation stable par graine. */
+function rng(seed: number) {
+  let s = seed % 2147483647;
+  if (s <= 0) s += 2147483646;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
 const STAR_PATH =
   "M12 2l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.77l-5.88 3.09 1.12-6.55L2.48 8.92l6.58-.96z";
+const CHECK_PATH = "M20 6L9 17l-5-5";
 
-// 5 étoiles vectorielles (le glyphe ★ n'existe pas dans la police par défaut).
 function stars(color: string, size: number) {
   return (
     <div style={{ display: "flex", gap: size * 0.14 }}>
@@ -77,7 +90,6 @@ function stars(color: string, size: number) {
   );
 }
 
-// La typographie choisie pilote graisse / casse / interlettrage des titres.
 const TYPO: Record<
   BrandIdentity["typography"],
   { weight: number; spacing: number; uppercase: boolean; lineHeight: number }
@@ -88,18 +100,192 @@ const TYPO: Record<
   technique: { weight: 800, spacing: 2, uppercase: true, lineHeight: 1.05 },
 };
 
-function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
-  const accent = v.accent === "secondaire" ? brand.colorSecondary : brand.colorPrimary;
-  const accent2 = v.accent === "secondaire" ? brand.colorPrimary : brand.colorSecondary;
-  const dark = v.mode === "sombre";
+const AUTO_STYLES: BgStyle[] = ["mesh", "diagonal", "blobs", "dots", "rings", "waves"];
 
-  // Fond dégradé subtil, teinté vers l'accent — jamais plat.
+/* ---------- fonds procéduraux (chacun unique selon la graine) ---------- */
+function backgroundLayers(
+  style: BgStyle,
+  seed: number,
+  accent: string,
+  accent2: string,
+  dark: boolean,
+  w: number,
+  h: number
+) {
+  const rand = rng(seed);
+  const soft = dark ? 0.34 : 0.2;
+  const layers: React.ReactNode[] = [];
+
+  if (style === "mesh") {
+    const spots = [
+      { c: accent, a: soft },
+      { c: accent2, a: soft * 0.7 },
+      { c: mix(accent, accent2, 0.5), a: soft * 0.55 },
+    ];
+    spots.forEach((s, i) => {
+      const size = h * (0.7 + rand() * 0.7);
+      layers.push(
+        <div
+          key={`m${i}`}
+          style={{
+            position: "absolute",
+            top: (rand() - 0.35) * h,
+            left: (rand() - 0.15) * w,
+            width: size,
+            height: size,
+            borderRadius: 9999,
+            background: `radial-gradient(circle, ${rgba(s.c, s.a)} 0%, ${rgba(s.c, 0)} 65%)`,
+            display: "flex",
+          }}
+        />
+      );
+    });
+  } else if (style === "diagonal") {
+    const angle = 18 + rand() * 20;
+    [0, 1].forEach((i) => {
+      layers.push(
+        <div
+          key={`d${i}`}
+          style={{
+            position: "absolute",
+            top: -h * 0.5,
+            left: w * (i === 0 ? 0.28 : 0.55) + rand() * w * 0.1,
+            width: w * (0.16 + rand() * 0.1),
+            height: h * 2,
+            background: `linear-gradient(${i ? accent2 : accent}, ${rgba(i ? accent2 : accent, 0.2)})`,
+            opacity: dark ? 0.5 : 0.28,
+            transform: `rotate(${angle}deg)`,
+            display: "flex",
+          }}
+        />
+      );
+    });
+  } else if (style === "blobs") {
+    for (let i = 0; i < 4; i++) {
+      const size = h * (0.18 + rand() * 0.4);
+      const c = [accent, accent2, mix(accent, accent2, 0.5)][i % 3];
+      layers.push(
+        <div
+          key={`b${i}`}
+          style={{
+            position: "absolute",
+            top: rand() * h * 0.9 - h * 0.1,
+            left: rand() * w * 0.95 - w * 0.05,
+            width: size,
+            height: size,
+            borderRadius: `${40 + rand() * 40}% ${40 + rand() * 40}% ${40 + rand() * 40}% ${40 + rand() * 40}%`,
+            background: rgba(c, dark ? 0.28 : 0.16),
+            display: "flex",
+          }}
+        />
+      );
+    }
+  } else if (style === "dots") {
+    const cols = 13;
+    const rows = Math.round((h / w) * cols);
+    const gapx = w / cols;
+    const gapy = h / rows;
+    const r = Math.max(3, w * 0.006);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        layers.push(
+          <div
+            key={`p${x}-${y}`}
+            style={{
+              position: "absolute",
+              top: y * gapy + gapy / 2,
+              left: x * gapx + gapx / 2,
+              width: r,
+              height: r,
+              borderRadius: 9999,
+              background: rgba(accent, dark ? 0.16 : 0.12),
+              display: "flex",
+            }}
+          />
+        );
+      }
+    }
+    // Un halo d'accent pour réchauffer la trame.
+    layers.push(
+      <div
+        key="dg"
+        style={{
+          position: "absolute",
+          bottom: -h * 0.4,
+          right: -w * 0.1,
+          width: h,
+          height: h,
+          borderRadius: 9999,
+          background: `radial-gradient(circle, ${rgba(accent2, soft)} 0%, ${rgba(accent2, 0)} 60%)`,
+          display: "flex",
+        }}
+      />
+    );
+  } else if (style === "rings") {
+    const cx = rand() > 0.5 ? w * 0.82 : w * 0.12;
+    const cy = rand() > 0.5 ? h * 0.2 : h * 0.82;
+    for (let i = 5; i >= 1; i--) {
+      const size = h * 0.22 * i;
+      layers.push(
+        <div
+          key={`r${i}`}
+          style={{
+            position: "absolute",
+            top: cy - size / 2,
+            left: cx - size / 2,
+            width: size,
+            height: size,
+            borderRadius: 9999,
+            border: `${Math.max(2, w * 0.0025)}px solid ${rgba(i % 2 ? accent : accent2, dark ? 0.22 : 0.16)}`,
+            display: "flex",
+          }}
+        />
+      );
+    }
+  } else if (style === "waves") {
+    layers.push(
+      <svg
+        key="wv"
+        width={w}
+        height={h}
+        viewBox={`0 0 ${w} ${h}`}
+        style={{ position: "absolute", top: 0, left: 0, display: "flex" }}
+      >
+        {[0, 1, 2].map((i) => {
+          const base = h * (0.62 + i * 0.12) + (rand() - 0.5) * h * 0.05;
+          const amp = h * (0.06 + rand() * 0.05);
+          const c = [accent, accent2, mix(accent, accent2, 0.5)][i % 3];
+          const d = `M0 ${base} C ${w * 0.3} ${base - amp}, ${w * 0.6} ${base + amp}, ${w} ${base - amp * 0.4} L ${w} ${h} L 0 ${h} Z`;
+          return <path key={i} d={d} fill={rgba(c, dark ? 0.22 : 0.14)} />;
+        })}
+      </svg>
+    );
+  }
+  return layers;
+}
+
+function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
+  const pool = accentPool(brand);
+  const seed = v.seed ?? hashString(v.headline);
+  const idx = ((v.accentIndex % pool.length) + pool.length) % pool.length;
+  const accent = pool[idx];
+  const accent2 = pool[(idx + 1) % pool.length];
+  const dark = v.mode === "sombre";
+  const style: BgStyle = v.bg === "auto" ? AUTO_STYLES[seed % AUTO_STYLES.length] : v.bg;
+  const hasPhoto = Boolean(v.bgImage);
+
   const baseDark = luminance(brand.colorDark) < 0.5 ? brand.colorDark : "#0d1b2e";
   const bg = dark
     ? `linear-gradient(140deg, ${mix(baseDark, "#000000", 0.15)} 0%, ${baseDark} 45%, ${mix(baseDark, accent, 0.22)} 100%)`
     : `linear-gradient(140deg, #ffffff 0%, ${mix("#ffffff", accent, 0.05)} 55%, ${mix("#ffffff", accent, 0.11)} 100%)`;
-  const ink = dark ? "#ffffff" : "#0f1720";
-  const sub = dark ? "rgba(255,255,255,0.66)" : "rgba(15,23,32,0.6)";
+
+  // Sur une photo : texte toujours clair, voile sombre pour la lisibilité.
+  const ink = hasPhoto ? "#ffffff" : dark ? "#ffffff" : "#0f1720";
+  const sub = hasPhoto
+    ? "rgba(255,255,255,0.82)"
+    : dark
+      ? "rgba(255,255,255,0.66)"
+      : "rgba(15,23,32,0.6)";
   const pad = Math.round(w * 0.078);
   const typo = TYPO[brand.typography] ?? TYPO.moderne;
   const cs = (t: string) => (typo.uppercase ? t.toUpperCase() : t);
@@ -112,38 +298,8 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
     lineHeight: typo.lineHeight,
   };
 
-  // Halo lumineux (radial) — donne de la profondeur.
-  const glow = (
-    <div
-      style={{
-        position: "absolute",
-        top: -h * 0.35,
-        right: -h * 0.2,
-        width: h * 1.1,
-        height: h * 1.1,
-        borderRadius: 9999,
-        background: `radial-gradient(circle, ${rgba(accent, dark ? 0.38 : 0.22)} 0%, ${rgba(accent, 0)} 62%)`,
-        display: "flex",
-      }}
-    />
-  );
-  const glow2 = (
-    <div
-      style={{
-        position: "absolute",
-        bottom: -h * 0.4,
-        left: -h * 0.3,
-        width: h * 0.95,
-        height: h * 0.95,
-        borderRadius: 9999,
-        background: `radial-gradient(circle, ${rgba(accent2, dark ? 0.2 : 0.12)} 0%, ${rgba(accent2, 0)} 60%)`,
-        display: "flex",
-      }}
-    />
-  );
-
-  // Barre d'accent verticale à gauche (structure).
-  const bar = (
+  // Barre d'accent verticale à gauche (structure), sauf en mode photo.
+  const bar = !hasPhoto ? (
     <div
       style={{
         position: "absolute",
@@ -155,7 +311,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
         display: "flex",
       }}
     />
-  );
+  ) : null;
 
   const logoBox = brand.logo ? (
     <div
@@ -167,7 +323,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        border: `1px solid ${rgba(ink, 0.08)}`,
+        border: `1px solid ${rgba("#000000", 0.08)}`,
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -213,9 +369,9 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
         alignSelf: "flex-start",
         alignItems: "center",
         gap: 10,
-        background: dark ? rgba(accent, 0.16) : rgba(accent, 0.12),
-        border: `1px solid ${rgba(accent, dark ? 0.4 : 0.3)}`,
-        color: dark ? mix(accent, "#ffffff", 0.35) : accent,
+        background: hasPhoto ? rgba(accent, 0.9) : dark ? rgba(accent, 0.16) : rgba(accent, 0.12),
+        border: `1px solid ${rgba(accent, hasPhoto ? 0.9 : dark ? 0.4 : 0.3)}`,
+        color: hasPhoto ? "#fff" : dark ? mix(accent, "#ffffff", 0.35) : accent,
         fontSize: w * 0.02,
         fontWeight: 800,
         letterSpacing: 2.5,
@@ -227,12 +383,23 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
     </div>
   );
 
-  let body;
+  const headline = (size = headlineSize) => (
+    <div style={{ display: "flex", fontSize: size, color: ink, ...headStyle }}>{cs(v.headline)}</div>
+  );
+
+  // Découpe la subline en points pour la checklist.
+  const items = v.subline
+    .split(/\s*(?:·|•|\/|\n|;)\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+
+  let body: React.ReactNode;
   if (v.template === "astuce") {
     body = (
       <div style={{ display: "flex", flexDirection: "column", gap: w * 0.022, maxWidth: "90%" }}>
         {eyebrow("ASTUCE")}
-        <div style={{ display: "flex", fontSize: headlineSize, color: ink, ...headStyle }}>{cs(v.headline)}</div>
+        {headline()}
         {v.subline ? (
           <div style={{ display: "flex", fontSize: w * 0.027, color: sub, lineHeight: 1.35, fontWeight: 500 }}>
             {v.subline}
@@ -248,7 +415,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
             display: "flex",
             fontSize: w * 0.2,
             fontWeight: 900,
-            color: accent,
+            color: hasPhoto ? "#fff" : accent,
             lineHeight: 0.92,
             letterSpacing: -4,
           }}
@@ -256,16 +423,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
           {v.headline}
         </div>
         {v.subline ? (
-          <div
-            style={{
-              display: "flex",
-              fontSize: w * 0.036,
-              fontWeight: 700,
-              color: ink,
-              lineHeight: 1.15,
-              maxWidth: "80%",
-            }}
-          >
+          <div style={{ display: "flex", fontSize: w * 0.036, fontWeight: 700, color: ink, lineHeight: 1.15, maxWidth: "80%" }}>
             {v.subline}
           </div>
         ) : null}
@@ -285,19 +443,87 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
         ) : null}
       </div>
     );
+  } else if (v.template === "duo") {
+    body = (
+      <div style={{ display: "flex", alignItems: "center", gap: w * 0.04, maxWidth: "100%" }}>
+        <div style={{ display: "flex", width: w * 0.012, alignSelf: "stretch", background: accent, borderRadius: 4 }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: w * 0.02, flex: 1 }}>
+          {headline(headlineSize * 0.92)}
+          {v.subline ? (
+            <div style={{ display: "flex", fontSize: w * 0.028, color: sub, lineHeight: 1.35, fontWeight: 500 }}>
+              {v.subline}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  } else if (v.template === "checklist") {
+    body = (
+      <div style={{ display: "flex", flexDirection: "column", gap: w * 0.022, maxWidth: "92%" }}>
+        {headline(headlineSize * 0.82)}
+        <div style={{ display: "flex", flexDirection: "column", gap: w * 0.016 }}>
+          {(items.length ? items : ["Profils vérifiés", "Matching par affinités", "Sans mauvaise surprise"]).map(
+            (it, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: w * 0.016 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: w * 0.038,
+                    height: w * 0.038,
+                    borderRadius: 9999,
+                    background: rgba(accent, dark || hasPhoto ? 0.2 : 0.14),
+                  }}
+                >
+                  <svg width={w * 0.022} height={w * 0.022} viewBox="0 0 24 24" style={{ display: "flex" }}>
+                    <path d={CHECK_PATH} stroke={accent} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <div style={{ display: "flex", fontSize: w * 0.03, color: ink, fontWeight: 600 }}>{it}</div>
+              </div>
+            )
+          )}
+        </div>
+      </div>
+    );
+  } else if (v.template === "punch") {
+    body = (
+      <div style={{ display: "flex", flexDirection: "column", gap: w * 0.02, maxWidth: "94%", alignItems: "flex-start" }}>
+        <div style={{ display: "flex", fontSize: headlineSize * 1.15, color: ink, ...headStyle }}>{cs(v.headline)}</div>
+        <div style={{ display: "flex", width: w * 0.14, height: w * 0.014, borderRadius: 8, background: accent }} />
+        {v.subline ? (
+          <div style={{ display: "flex", fontSize: w * 0.03, color: sub, fontWeight: 500, lineHeight: 1.3 }}>
+            {v.subline}
+          </div>
+        ) : null}
+      </div>
+    );
+  } else if (v.template === "temoignage") {
+    body = (
+      <div style={{ display: "flex", flexDirection: "column", gap: w * 0.02, maxWidth: "88%" }}>
+        {stars(hasPhoto ? "#fff" : accent, w * 0.034)}
+        <div style={{ display: "flex", fontSize: headlineSize * 0.88, color: ink, ...headStyle, lineHeight: 1.12 }}>
+          {cs(v.headline)}
+        </div>
+        {v.subline ? (
+          <div style={{ display: "flex", fontSize: w * 0.024, color: sub, fontWeight: 600 }}>— {v.subline}</div>
+        ) : null}
+      </div>
+    );
   } else {
-    // annonce : eyebrow + gros titre + preuve sociale
+    // annonce
     body = (
       <div style={{ display: "flex", flexDirection: "column", gap: w * 0.02, maxWidth: "90%" }}>
         {eyebrow("NOUVEAU")}
-        <div style={{ display: "flex", fontSize: headlineSize, color: ink, ...headStyle }}>{cs(v.headline)}</div>
+        {headline()}
         {v.subline ? (
           <div style={{ display: "flex", fontSize: w * 0.028, color: sub, lineHeight: 1.35, fontWeight: 500 }}>
             {v.subline}
           </div>
         ) : null}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: w * 0.008 }}>
-          {stars(accent, w * 0.026)}
+          {stars(hasPhoto ? "#fff" : accent, w * 0.026)}
           <div style={{ display: "flex", fontSize: w * 0.019, color: sub, fontWeight: 600 }}>
             Gratuit sur l&apos;App Store &amp; Google Play
           </div>
@@ -316,13 +542,37 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
         justifyContent: "space-between",
         background: bg,
         padding: pad,
-        paddingLeft: pad + w * 0.012,
+        paddingLeft: hasPhoto ? pad : pad + w * 0.012,
         position: "relative",
         fontFamily: "sans-serif",
       }}
     >
-      {glow}
-      {glow2}
+      {/* Photo/meme en arrière-plan (facultatif) + voile de lisibilité */}
+      {hasPhoto ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={v.bgImage as string}
+            alt=""
+            width={w}
+            height={h}
+            style={{ position: "absolute", top: 0, left: 0, width: w, height: h, objectFit: "cover", display: "flex" }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: w,
+              height: h,
+              background: `linear-gradient(160deg, ${rgba(baseDark, 0.35)} 0%, ${rgba(baseDark, 0.55)} 55%, ${rgba(baseDark, 0.82)} 100%)`,
+              display: "flex",
+            }}
+          />
+        </>
+      ) : (
+        backgroundLayers(style, seed, accent, accent2, dark, w, h)
+      )}
       {bar}
       {wordmark}
       {body}

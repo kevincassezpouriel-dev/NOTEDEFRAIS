@@ -23,6 +23,7 @@ export interface BrandIdentity {
   colorPrimary: string; // couleur principale (hex)
   colorSecondary: string; // couleur secondaire (hex)
   colorDark: string; // fond sombre de marque (hex)
+  palette: string[]; // couleurs additionnelles de la marque (hex) — ajoutables librement
   typography: Typography; // personnalité typographique des visuels
   logo: string | null; // logo en data-URL (affiché sur les visuels)
 }
@@ -49,9 +50,27 @@ export const DEFAULT_BRAND: BrandIdentity = {
   colorPrimary: "#5b6ef5",
   colorSecondary: "#f0576d",
   colorDark: "#1e2749",
+  // Couleurs additionnelles de la palette Minggle : elles élargissent le
+  // choix d'accent des visuels (chaque post peut piocher une teinte
+  // différente → des visuels vraiment variés). Ajoutables/supprimables
+  // librement dans /admin/marque.
+  palette: ["#7c5cff", "#ff9f43", "#28c7a3", "#ffd166"],
   typography: "moderne",
   logo: null,
 };
+
+/**
+ * Réservoir de couleurs d'accent : les rôles sémantiques (principale,
+ * secondaire) + toutes les couleurs additionnelles de la palette, dédoublonnées.
+ * Le moteur visuel y pioche une teinte différente selon le post, ce qui rend
+ * chaque visuel distinct tout en restant strictement dans la charte.
+ */
+export function accentPool(brand: BrandIdentity): string[] {
+  const all = [brand.colorPrimary, brand.colorSecondary, ...(brand.palette ?? [])]
+    .map((c) => (c || "").toLowerCase())
+    .filter((c) => /^#[0-9a-f]{6}$/.test(c));
+  return Array.from(new Set(all.length ? all : ["#5b6ef5", "#f0576d"]));
+}
 
 export async function getBrand(): Promise<BrandIdentity> {
   const row = await prisma.setting.findUnique({ where: { key: "brand" } });
@@ -111,7 +130,15 @@ site et adaptables aux réseaux sociaux (Instagram, TikTok, LinkedIn, Facebook).
 Pour le visuel, tu raisonnes en directeur artistique : l'accroche visuelle
 (headline) est une punchline COURTE pensée pour l'image — pas un copier-coller
 du titre — et le gabarit choisi doit correspondre à l'angle du contenu.
+
+VARIÉTÉ VISUELLE (impératif) : chaque post doit avoir un visuel DIFFÉRENT des
+précédents. Fais varier délibérément le gabarit, le style de fond, la couleur
+d'accent (index dans la palette) et le mode (sombre/clair) d'un post à l'autre —
+ne reproduis jamais deux fois la même combinaison. Palette d'accents
+disponible (choisis un index) : ${accentPool(brand)
+      .map((c, i) => `${i}=${c}`)
+      .join(", ")}.
 La charte graphique (couleurs, typographie${brand.logo ? ", logo" : ""}) est
-appliquée automatiquement au rendu : tu n'as qu'à choisir gabarit, textes,
-accent et mode (sombre/clair) cohérents avec la marque.`;
+appliquée automatiquement au rendu : tu n'as qu'à choisir gabarit, style de
+fond, index d'accent, mode et textes cohérents avec la marque.`;
 }

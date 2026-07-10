@@ -3,7 +3,30 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useState } from "react";
-import { parseVisual, TEMPLATES, type VisualSpec } from "@/lib/visual";
+import { parseVisual, TEMPLATES, BG_STYLES, type VisualSpec } from "@/lib/visual";
+
+/** Réduit une image de fond en JPEG ≤ 1280 px (data-URL) pour l'embarquer. */
+async function fileToBg(file: File): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = reject;
+    i.src = dataUrl;
+  });
+  const max = 1280;
+  const scale = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * scale);
+  c.height = Math.round(img.height * scale);
+  c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.72);
+}
 
 interface PostDetail {
   id: string;
@@ -29,6 +52,7 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
   const router = useRouter();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [visual, setVisual] = useState<VisualSpec | null>(null);
+  const [pool, setPool] = useState<string[]>([]); // palette d'accents (couleurs de marque)
   const [visualVersion, setVisualVersion] = useState(0); // force le refresh de l'aperçu
   const [qrcodes, setQrcodes] = useState<Option[]>([]);
   const [campaigns, setCampaigns] = useState<Option[]>([]);
@@ -37,18 +61,30 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [postRes, qrRes, campRes] = await Promise.all([
+    const [postRes, qrRes, campRes, brandRes] = await Promise.all([
       fetch(`/api/admin/posts/${id}`, { cache: "no-store" }),
       fetch("/api/admin/qrcodes", { cache: "no-store" }),
       fetch("/api/admin/campaigns", { cache: "no-store" }),
+      fetch("/api/admin/brand", { cache: "no-store" }),
     ]);
     if (postRes.ok) {
       const p = (await postRes.json()) as PostDetail;
       setPost(p);
-      setVisual(parseVisual(p.visual, p.title));
+      setVisual(parseVisual(p.visual, p.title, p.slug));
     }
     if (qrRes.ok) setQrcodes(await qrRes.json());
     if (campRes.ok) setCampaigns(await campRes.json());
+    if (brandRes.ok) {
+      const b = (await brandRes.json()) as {
+        colorPrimary: string;
+        colorSecondary: string;
+        palette?: string[];
+      };
+      const all = [b.colorPrimary, b.colorSecondary, ...(b.palette ?? [])]
+        .map((c) => (c || "").toLowerCase())
+        .filter((c) => /^#[0-9a-f]{6}$/.test(c));
+      setPool(Array.from(new Set(all)));
+    }
   }, [id]);
 
   useEffect(() => {
@@ -189,19 +225,20 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1" htmlFor="v-accent">Accent</label>
+                <label className="block text-xs font-medium mb-1" htmlFor="v-bg">Style de fond</label>
                 <select
-                  id="v-accent"
+                  id="v-bg"
                   className="input !w-auto"
-                  value={visual.accent}
-                  onChange={(e) => setVisual({ ...visual, accent: e.target.value as VisualSpec["accent"] })}
+                  value={visual.bg}
+                  onChange={(e) => setVisual({ ...visual, bg: e.target.value as VisualSpec["bg"] })}
                 >
-                  <option value="primaire">Couleur principale</option>
-                  <option value="secondaire">Couleur secondaire</option>
+                  {BG_STYLES.map((b) => (
+                    <option key={b.value} value={b.value}>{b.label}</option>
+                  ))}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1" htmlFor="v-mode">Fond</label>
+                <label className="block text-xs font-medium mb-1" htmlFor="v-mode">Mode</label>
                 <select
                   id="v-mode"
                   className="input !w-auto"
@@ -211,6 +248,69 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
                   <option value="sombre">Sombre</option>
                   <option value="clair">Clair</option>
                 </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Couleur d&apos;accent</label>
+              <div className="flex flex-wrap items-center gap-2">
+                {pool.map((c, i) => {
+                  const on = (visual.accentIndex % (pool.length || 1)) === i;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      aria-label={`Accent ${c}`}
+                      onClick={() => setVisual({ ...visual, accentIndex: i })}
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: 8,
+                        background: c,
+                        border: on ? "3px solid var(--text-primary)" : "1px solid var(--border)",
+                        cursor: "pointer",
+                      }}
+                    />
+                  );
+                })}
+                <Link href="/admin/marque" className="text-xs underline" style={{ color: "var(--text-muted)" }}>
+                  + gérer la palette
+                </Link>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" htmlFor="v-bgimg">
+                Image de fond (photo / meme — optionnel)
+              </label>
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  id="v-bgimg"
+                  type="file"
+                  accept="image/*"
+                  className="text-xs"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      setVisual({ ...visual, bgImage: await fileToBg(file) });
+                    } catch {
+                      setMessage({ text: "Impossible de lire cette image", error: true });
+                    }
+                  }}
+                />
+                {visual.bgImage && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary !py-1 text-xs"
+                    onClick={() => setVisual({ ...visual, bgImage: null })}
+                  >
+                    Retirer l&apos;image
+                  </button>
+                )}
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {visual.bgImage
+                    ? "Photo posée en fond, texte et charte par-dessus."
+                    : "Sans image : fond graphique généré (varié selon le post)."}
+                </span>
               </div>
             </div>
             <div className="flex flex-wrap gap-3">

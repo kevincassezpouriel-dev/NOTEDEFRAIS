@@ -79,27 +79,43 @@ const POST_SCHEMA = {
     visual: {
       type: "object" as const,
       description:
-        "Direction artistique du visuel de marque qui accompagne le post (rendu automatiquement aux couleurs de la marque)",
+        "Direction artistique du visuel de marque (rendu automatiquement dans la charte). Fais-le VARIER à chaque post : ne réutilise pas la même combinaison gabarit/fond/accent que d'habitude.",
       properties: {
         template: {
           type: "string" as const,
-          enum: ["annonce", "astuce", "stat", "citation"],
+          enum: [
+            "annonce",
+            "astuce",
+            "stat",
+            "citation",
+            "duo",
+            "checklist",
+            "punch",
+            "temoignage",
+          ],
           description:
-            "Gabarit : annonce (grand titre), astuce (pastille conseil), stat (chiffre fort en très grand), citation (verbatim)",
+            "Gabarit adapté à l'angle : annonce (grand titre + preuve sociale), astuce (pastille conseil), stat (chiffre fort en très grand), citation (verbatim), duo (titre + accroche), checklist (points clés — mets-les dans subline séparés par « · »), punch (punchline plein cadre), temoignage (avis + étoiles)",
         },
         headline: {
           type: "string" as const,
           description:
-            "Punchline COURTE affichée en grand sur l'image (max 60 caractères). Pas un copier-coller du titre : pensée pour l'image. Pour le gabarit stat : le chiffre seul (ex. « 3× », « +120 % »)",
+            "Punchline COURTE affichée en grand sur l'image (max 60 caractères). Pas un copier-coller du titre : pensée pour l'image. Pour stat : le chiffre seul (ex. « 3× », « +120 % »)",
         },
         subline: {
           type: "string" as const,
-          description: "Ligne secondaire sur l'image (max 90 caractères, ou vide)",
+          description:
+            "Ligne secondaire sur l'image (max 90 caractères, ou vide). Pour checklist : 2-3 points séparés par « · »",
         },
-        accent: {
+        accentIndex: {
+          type: "integer" as const,
+          description:
+            "Index de la couleur d'accent dans la palette de marque verrouillée (0 = principale, 1 = secondaire, 2+ = couleurs additionnelles). Varie-le d'un post à l'autre.",
+        },
+        bg: {
           type: "string" as const,
-          enum: ["primaire", "secondaire"],
-          description: "Couleur d'accent (dans la palette de marque verrouillée)",
+          enum: ["auto", "mesh", "diagonal", "blobs", "dots", "rings", "waves"],
+          description:
+            "Style de fond graphique : auto (varié automatiquement), mesh (halos), diagonal (bandes), blobs (formes organiques), dots (trame de points), rings (cercles), waves (vagues). Choisis un style différent des posts précédents.",
         },
         mode: {
           type: "string" as const,
@@ -107,7 +123,7 @@ const POST_SCHEMA = {
           description: "Fond sombre (impactant) ou clair (léger) selon le ton du post",
         },
       },
-      required: ["template", "headline", "subline", "accent", "mode"],
+      required: ["template", "headline", "subline", "accentIndex", "bg", "mode"],
       additionalProperties: false,
     },
   },

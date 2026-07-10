@@ -18,9 +18,12 @@ interface Brand {
   colorPrimary: string;
   colorSecondary: string;
   colorDark: string;
+  palette: string[];
   typography: Typography;
   logo: string | null;
 }
+
+const DEFAULT_NEW_COLOR = "#28c7a3";
 
 const TYPO_OPTIONS: { value: Typography; label: string; hint: string }[] = [
   { value: "moderne", label: "Moderne", hint: "Sans-serif dense, minuscules" },
@@ -43,7 +46,7 @@ async function fileToLogo(file: File): Promise<string> {
     i.onerror = reject;
     i.src = dataUrl;
   });
-  const max = 256;
+  const max = 512;
   const scale = Math.min(1, max / Math.max(img.width, img.height));
   const c = document.createElement("canvas");
   c.width = Math.round(img.width * scale);
@@ -242,7 +245,10 @@ export default function MarquePage() {
           </div>
 
           <div>
-            <p className="text-xs font-medium mb-2">Palette</p>
+            <p className="text-xs font-medium mb-1">Couleurs de rôle</p>
+            <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+              Les trois couleurs structurelles de la charte.
+            </p>
             <div className="flex flex-wrap gap-4">
               <ColorField label="Principale" value={brand.colorPrimary}
                 onChange={(v) => setBrand({ ...brand, colorPrimary: v })} />
@@ -250,6 +256,52 @@ export default function MarquePage() {
                 onChange={(v) => setBrand({ ...brand, colorSecondary: v })} />
               <ColorField label="Fond sombre" value={brand.colorDark}
                 onChange={(v) => setBrand({ ...brand, colorDark: v })} />
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium mb-1">Couleurs d&apos;accent additionnelles</p>
+            <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+              Ajoute autant de couleurs que tu veux : chaque visuel en pioche une
+              différente, ce qui rend les posts variés — tout en restant dans ta charte.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              {brand.palette.map((c, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <input
+                    type="color"
+                    value={c}
+                    onChange={(e) => {
+                      const next = [...brand.palette];
+                      next[i] = e.target.value;
+                      setBrand({ ...brand, palette: next });
+                    }}
+                    className="w-9 h-9 rounded cursor-pointer border-0 bg-transparent"
+                    aria-label={`Couleur ${i + 1}`}
+                  />
+                  <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{c}</span>
+                  <button
+                    type="button"
+                    aria-label="Retirer cette couleur"
+                    className="text-xs w-5 h-5 rounded-full leading-none"
+                    style={{ background: "var(--page)", color: "var(--text-muted)" }}
+                    onClick={() =>
+                      setBrand({ ...brand, palette: brand.palette.filter((_, j) => j !== i) })
+                    }
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn btn-secondary !py-1 text-xs"
+                onClick={() =>
+                  setBrand({ ...brand, palette: [...brand.palette, DEFAULT_NEW_COLOR] })
+                }
+              >
+                + Ajouter une couleur
+              </button>
             </div>
           </div>
         </section>
