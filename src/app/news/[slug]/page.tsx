@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { renderMarkdown } from "@/lib/markdown";
+import { getBrand } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -32,10 +33,13 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function PostPage({ params }: Props) {
   const { slug } = await params;
-  const post = await prisma.post.findUnique({
-    where: { slug },
-    include: { qrCode: { select: { slug: true, type: true } } },
-  });
+  const [post, brand] = await Promise.all([
+    prisma.post.findUnique({
+      where: { slug },
+      include: { qrCode: { select: { slug: true, type: true } } },
+    }),
+    getBrand(),
+  ]);
   if (!post || post.status !== "published") notFound();
 
   // Attribution par post : la source = utm_source unique du post
@@ -78,7 +82,7 @@ export default async function PostPage({ params }: Props) {
 
         <div className="mt-10 text-center">
           <a href={ctaHref} className="btn btn-primary text-base px-6 py-3">
-            📲 Télécharger MINGGLE
+            Installe {brand.name}
           </a>
         </div>
 
