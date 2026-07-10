@@ -61,6 +61,22 @@ function luminance(hex: string): number {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 }
 
+const STAR_PATH =
+  "M12 2l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.77l-5.88 3.09 1.12-6.55L2.48 8.92l6.58-.96z";
+
+// 5 étoiles vectorielles (le glyphe ★ n'existe pas dans la police par défaut).
+function stars(color: string, size: number) {
+  return (
+    <div style={{ display: "flex", gap: size * 0.14 }}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <svg key={i} width={size} height={size} viewBox="0 0 24 24" style={{ display: "flex" }}>
+          <path d={STAR_PATH} fill={color} />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
 // La typographie choisie pilote graisse / casse / interlettrage des titres.
 const TYPO: Record<
   BrandIdentity["typography"],
@@ -281,7 +297,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
           </div>
         ) : null}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: w * 0.008 }}>
-          <div style={{ display: "flex", fontSize: w * 0.026, color: accent }}>★★★★★</div>
+          {stars(accent, w * 0.026)}
           <div style={{ display: "flex", fontSize: w * 0.019, color: sub, fontWeight: 600 }}>
             Gratuit sur l&apos;App Store &amp; Google Play
           </div>
