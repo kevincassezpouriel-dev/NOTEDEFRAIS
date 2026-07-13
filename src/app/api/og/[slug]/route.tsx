@@ -7,6 +7,41 @@ import type { BrandIdentity } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
+/* ---------- polices de marque (TTF servis depuis /public/fonts) ----------
+ * Satori (le rasteriseur) n'a AUCUNE police par défaut digne d'un visuel de
+ * marque : on embarque Space Grotesk (géométrique, moderne) et Archivo Black
+ * (ultra-graisse pour le style « impactant »). Chargées une seule fois par
+ * instance serveur. */
+let fontsPromise:
+  | Promise<{ name: string; data: ArrayBuffer; weight: 300 | 400 | 500 | 700; style: "normal" }[]>
+  | null = null;
+function loadFonts(origin: string) {
+  if (!fontsPromise) {
+    fontsPromise = Promise.all(
+      (
+        [
+          { file: "SpaceGrotesk-Bold.ttf", name: "Space Grotesk", weight: 700 },
+          { file: "SpaceGrotesk-Medium.ttf", name: "Space Grotesk", weight: 500 },
+          { file: "SpaceGrotesk-Light.ttf", name: "Space Grotesk", weight: 300 },
+          { file: "ArchivoBlack.ttf", name: "Archivo Black", weight: 400 },
+        ] as const
+      ).map(async (f) => ({
+        name: f.name,
+        weight: f.weight,
+        style: "normal" as const,
+        data: await fetch(`${origin}/fonts/${f.file}`).then((r) => {
+          if (!r.ok) throw new Error(`police ${f.file} : ${r.status}`);
+          return r.arrayBuffer();
+        }),
+      }))
+    ).catch((e) => {
+      fontsPromise = null; // retentera à la prochaine requête
+      throw e;
+    });
+  }
+  return fontsPromise;
+}
+
 /**
  * Moteur de composition visuelle : rend le visuel de marque d'un post.
  * La charte (couleurs, logo, typo) est verrouillée, MAIS chaque post combine
@@ -36,10 +71,13 @@ export async function GET(
 
   const brand = await getBrand();
   const visual = parseVisual(post.visual, post.title, slug);
+  // Sans les polices embarquées, le rendu retombe sur la police système.
+  const fonts = await loadFonts(req.nextUrl.origin).catch(() => []);
 
   return new ImageResponse(render(visual, brand, width, height), {
     width,
     height,
+    ...(fonts.length ? { fonts } : {}),
     headers: { "Cache-Control": "public, max-age=300" },
   });
 }
@@ -168,14 +206,15 @@ function motifSvg(motif: Motif, color: string, size: number, strokeW = 2) {
   );
 }
 
+// Chaque personnalité typographique = une vraie police + graisse + casse.
 const TYPO: Record<
   BrandIdentity["typography"],
-  { weight: number; spacing: number; uppercase: boolean; lineHeight: number }
+  { family: string; weight: number; spacing: number; uppercase: boolean; lineHeight: number }
 > = {
-  moderne: { weight: 800, spacing: -1.5, uppercase: false, lineHeight: 1.02 },
-  impactful: { weight: 900, spacing: -2, uppercase: true, lineHeight: 0.98 },
-  elegant: { weight: 600, spacing: -0.2, uppercase: false, lineHeight: 1.12 },
-  technique: { weight: 800, spacing: 2, uppercase: true, lineHeight: 1.05 },
+  moderne: { family: "Space Grotesk", weight: 700, spacing: -1.5, uppercase: false, lineHeight: 1.02 },
+  impactful: { family: "Archivo Black", weight: 400, spacing: -0.5, uppercase: true, lineHeight: 1.0 },
+  elegant: { family: "Space Grotesk", weight: 300, spacing: 0.5, uppercase: false, lineHeight: 1.14 },
+  technique: { family: "Space Grotesk", weight: 500, spacing: 4, uppercase: true, lineHeight: 1.08 },
 };
 
 const AUTO_STYLES: BgStyle[] = ["mesh", "diagonal", "blobs", "dots", "rings", "waves", "pattern"];
@@ -415,10 +454,36 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
   const hlen = v.headline.length;
   const headlineSize = hlen > 52 ? w * 0.058 : hlen > 32 ? w * 0.072 : w * 0.088;
   const headStyle = {
+    fontFamily: typo.family,
     fontWeight: typo.weight,
     letterSpacing: typo.spacing,
     lineHeight: typo.lineHeight,
   };
+  // Titre en dégradé subtil (blanc → teinte d'accent) sur fond sombre/photo :
+  // donne la profondeur d'un vrai lettrage travaillé. Encre pleine en clair.
+  const headlineFill =
+    dark || hasPhoto
+      ? {
+          backgroundImage: `linear-gradient(105deg, #ffffff 35%, ${mix(accent, "#ffffff", 0.45)} 100%)`,
+          backgroundClip: "text" as const,
+          color: "transparent",
+        }
+      : { color: ink };
+  // Vignette : assombrit légèrement les bords → le regard reste au centre.
+  const vignette =
+    dark || hasPhoto ? (
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: w,
+          height: h,
+          background: `radial-gradient(circle at 30% 25%, rgba(0,0,0,0) 52%, rgba(0,0,0,${hasPhoto ? 0.25 : 0.32}) 100%)`,
+          display: "flex",
+        }}
+      />
+    ) : null;
 
   // Barre d'accent verticale à gauche (structure), sauf en mode photo.
   const bar = !hasPhoto ? (
@@ -532,7 +597,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
   );
 
   const headline = (size = headlineSize) => (
-    <div style={{ display: "flex", fontSize: size, color: ink, ...headStyle }}>{cs(v.headline)}</div>
+    <div style={{ display: "flex", fontSize: size, ...headlineFill, ...headStyle }}>{cs(v.headline)}</div>
   );
 
   // Découpe la subline en points pour la checklist.
@@ -581,7 +646,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
     body = (
       <div style={{ display: "flex", flexDirection: "column", gap: w * 0.01, maxWidth: "88%" }}>
         <div style={{ display: "flex", fontSize: w * 0.14, fontWeight: 900, color: accent, lineHeight: 0.5 }}>“</div>
-        <div style={{ display: "flex", fontSize: headlineSize * 0.9, color: ink, ...headStyle, lineHeight: 1.1 }}>
+        <div style={{ display: "flex", fontSize: headlineSize * 0.9, ...headlineFill, ...headStyle, lineHeight: 1.1 }}>
           {v.headline}
         </div>
         {v.subline ? (
@@ -638,7 +703,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
   } else if (v.template === "punch") {
     body = (
       <div style={{ display: "flex", flexDirection: "column", gap: w * 0.02, maxWidth: "94%", alignItems: "flex-start" }}>
-        <div style={{ display: "flex", fontSize: headlineSize * 1.15, color: ink, ...headStyle }}>{cs(v.headline)}</div>
+        <div style={{ display: "flex", fontSize: headlineSize * 1.15, ...headlineFill, ...headStyle }}>{cs(v.headline)}</div>
         <div style={{ display: "flex", width: w * 0.14, height: w * 0.014, borderRadius: 8, background: accent }} />
         {v.subline ? (
           <div style={{ display: "flex", fontSize: w * 0.03, color: sub, fontWeight: 500, lineHeight: 1.3 }}>
@@ -651,7 +716,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
     body = (
       <div style={{ display: "flex", flexDirection: "column", gap: w * 0.02, maxWidth: "88%" }}>
         {stars(hasPhoto ? "#fff" : accent, w * 0.034)}
-        <div style={{ display: "flex", fontSize: headlineSize * 0.88, color: ink, ...headStyle, lineHeight: 1.12 }}>
+        <div style={{ display: "flex", fontSize: headlineSize * 0.88, ...headlineFill, ...headStyle, lineHeight: 1.12 }}>
           {cs(v.headline)}
         </div>
         {v.subline ? (
@@ -663,6 +728,8 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
     // Meme : motif géant en badge + texte choc centré — l'énergie d'un meme,
     // dans la charte.
     const m: Motif = v.motif === "aucun" ? "eclair" : v.motif;
+    const compact = v.headline.length > 40;
+    const badge = w * (compact ? 0.11 : 0.15);
     body = (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: w * 0.024, width: "100%" }}>
         <div
@@ -670,23 +737,24 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: w * 0.15,
-            height: w * 0.15,
-            borderRadius: w * 0.045,
+            width: badge,
+            height: badge,
+            borderRadius: badge * 0.3,
             background: `linear-gradient(135deg, ${accent}, ${mix(accent, accent2, 0.75)})`,
             transform: "rotate(-5deg)",
           }}
         >
-          {motifSvg(m, "#ffffff", w * 0.09, 2.2)}
+          {motifSvg(m, "#ffffff", badge * 0.6, 2.2)}
         </div>
         <div
           style={{
             display: "flex",
             justifyContent: "center",
             textAlign: "center",
-            fontSize: headlineSize * 0.95,
-            color: ink,
-            fontWeight: 900,
+            fontSize: headlineSize * (compact ? 0.82 : 0.95),
+            ...headlineFill,
+            fontFamily: typo.family,
+            fontWeight: typo.weight,
             letterSpacing: -1,
             lineHeight: 1.02,
             maxWidth: "92%",
@@ -850,7 +918,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
         padding: pad,
         paddingLeft: hasPhoto ? pad : pad + w * 0.012,
         position: "relative",
-        fontFamily: "sans-serif",
+        fontFamily: '"Space Grotesk", sans-serif',
       }}
     >
       {/* Photo/meme en arrière-plan (facultatif) + voile de lisibilité */}
@@ -879,6 +947,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
       ) : (
         backgroundLayers(style, seed, accent, accent2, dark, w, h, v.motif)
       )}
+      {vignette}
       {bar}
       {topRow}
       {body}
