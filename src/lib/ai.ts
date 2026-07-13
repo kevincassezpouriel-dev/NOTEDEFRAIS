@@ -92,19 +92,21 @@ const POST_SCHEMA = {
             "checklist",
             "punch",
             "temoignage",
+            "match",
+            "meme",
           ],
           description:
-            "Gabarit adapté à l'angle : annonce (grand titre + preuve sociale), astuce (pastille conseil), stat (chiffre fort en très grand), citation (verbatim), duo (titre + accroche), checklist (points clés — mets-les dans subline séparés par « · »), punch (punchline plein cadre), temoignage (avis + étoiles)",
+            "Gabarit adapté à l'angle : annonce (grand titre + preuve sociale), astuce (pastille conseil), stat (chiffre fort en très grand), citation (verbatim), duo (titre + accroche), checklist (points clés — mets-les dans subline séparés par « · »), punch (punchline plein cadre), temoignage (avis + étoiles), match (carte de match façon UI de l'app : headline = « Prénom + Prénom », subline = « NN % · tag · tag »), meme (motif géant + texte choc centré, énergie meme)",
         },
         headline: {
           type: "string" as const,
           description:
-            "Punchline COURTE affichée en grand sur l'image (max 60 caractères). Pas un copier-coller du titre : pensée pour l'image. Pour stat : le chiffre seul (ex. « 3× », « +120 % »)",
+            "Punchline COURTE affichée en grand sur l'image (max 60 caractères). Pas un copier-coller du titre : pensée pour l'image. Pour stat : le chiffre seul (ex. « 3× », « +120 % »). Pour match : « Prénom + Prénom »",
         },
         subline: {
           type: "string" as const,
           description:
-            "Ligne secondaire sur l'image (max 90 caractères, ou vide). Pour checklist : 2-3 points séparés par « · »",
+            "Ligne secondaire sur l'image (max 90 caractères, ou vide). Pour checklist : 2-3 points séparés par « · ». Pour match : « 93 % · budget ok · même rythme »",
         },
         accentIndex: {
           type: "integer" as const,
@@ -113,9 +115,29 @@ const POST_SCHEMA = {
         },
         bg: {
           type: "string" as const,
-          enum: ["auto", "mesh", "diagonal", "blobs", "dots", "rings", "waves"],
+          enum: ["auto", "mesh", "diagonal", "blobs", "dots", "rings", "waves", "pattern"],
           description:
-            "Style de fond graphique : auto (varié automatiquement), mesh (halos), diagonal (bandes), blobs (formes organiques), dots (trame de points), rings (cercles), waves (vagues). Choisis un style différent des posts précédents.",
+            "Style de fond graphique : auto (varié automatiquement), mesh (halos), diagonal (bandes), blobs (formes organiques), dots (trame de points), rings (cercles), waves (vagues), pattern (motif répété en papier peint). Choisis un style différent des posts précédents.",
+        },
+        motif: {
+          type: "string" as const,
+          enum: [
+            "aucun",
+            "maison",
+            "coeur",
+            "cle",
+            "bulle",
+            "eclair",
+            "etoile",
+            "puzzle",
+            "pin",
+            "soleil",
+            "plante",
+            "tasse",
+            "fusee",
+          ],
+          description:
+            "Illustration de marque intégrée au visuel (badge, meme ou papier peint). Choisis-la cohérente avec l'angle (ex. maison pour le logement, coeur pour un match, cle pour l'emménagement).",
         },
         mode: {
           type: "string" as const,
@@ -123,7 +145,7 @@ const POST_SCHEMA = {
           description: "Fond sombre (impactant) ou clair (léger) selon le ton du post",
         },
       },
-      required: ["template", "headline", "subline", "accentIndex", "bg", "mode"],
+      required: ["template", "headline", "subline", "accentIndex", "bg", "motif", "mode"],
       additionalProperties: false,
     },
   },
@@ -149,6 +171,7 @@ export async function generateMarketingPost(opts: {
   existingTitles?: string[];
   learnings?: string[];
   performanceBrief?: string;
+  recentVisuals?: string[];
 }): Promise<GeneratedPost> {
   const parts: string[] = [];
   if (opts.brief) {
@@ -184,6 +207,11 @@ export async function generateMarketingPost(opts: {
   if (opts.existingTitles?.length) {
     parts.push(
       `Titres déjà publiés (n'écris PAS un post redondant avec ceux-ci) :\n- ${opts.existingTitles.join("\n- ")}`
+    );
+  }
+  if (opts.recentVisuals?.length) {
+    parts.push(
+      `Visuels des posts récents (INTERDIT de reproduire ces combinaisons — change de gabarit, de fond, d'accent et de motif) :\n- ${opts.recentVisuals.join("\n- ")}`
     );
   }
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useState } from "react";
-import { parseVisual, TEMPLATES, BG_STYLES, type VisualSpec } from "@/lib/visual";
+import { parseVisual, TEMPLATES, BG_STYLES, MOTIFS, type VisualSpec } from "@/lib/visual";
 
 /** Réduit une image de fond en JPEG ≤ 1280 px (data-URL) pour l'embarquer. */
 async function fileToBg(file: File): Promise<string> {
@@ -238,6 +238,19 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
                 </select>
               </div>
               <div>
+                <label className="block text-xs font-medium mb-1" htmlFor="v-motif">Motif</label>
+                <select
+                  id="v-motif"
+                  className="input !w-auto"
+                  value={visual.motif}
+                  onChange={(e) => setVisual({ ...visual, motif: e.target.value as VisualSpec["motif"] })}
+                >
+                  {MOTIFS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="block text-xs font-medium mb-1" htmlFor="v-mode">Mode</label>
                 <select
                   id="v-mode"
@@ -248,6 +261,18 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
                   <option value="sombre">Sombre</option>
                   <option value="clair">Clair</option>
                 </select>
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  title="Relance la composition du fond avec une nouvelle variation aléatoire"
+                  onClick={() =>
+                    setVisual({ ...visual, seed: Math.floor(Math.random() * 2147483646) + 1 })
+                  }
+                >
+                  🎲 Varier
+                </button>
               </div>
             </div>
             <div>

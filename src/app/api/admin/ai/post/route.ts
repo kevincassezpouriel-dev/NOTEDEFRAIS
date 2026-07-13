@@ -6,6 +6,7 @@ import { createPost } from "@/lib/posts";
 import { topLearnings } from "@/lib/learnings";
 import { performanceBrief } from "@/lib/performance";
 import { assetUrl } from "@/lib/engine";
+import { parseVisual, describeVisual, diversifyVisual } from "@/lib/visual";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -42,7 +43,11 @@ export async function POST(req: NextRequest) {
   ]);
 
   const [existingPosts, statsSummary, learnings, perfBrief] = await Promise.all([
-    prisma.post.findMany({ select: { title: true }, orderBy: { createdAt: "desc" }, take: 10 }),
+    prisma.post.findMany({
+      select: { title: true, slug: true, visual: true },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
     body.useStats !== false
       ? computeStats(undefined, 30).then(statsSummaryForAi)
       : Promise.resolve(undefined),
@@ -54,6 +59,11 @@ export async function POST(req: NextRequest) {
   const trackedUrl = assetUrl(origin, qr);
   const resolvedCampaignId = campaign?.id ?? qr?.campaignId ?? null;
 
+  // Visuels récents : fournis à l'IA (« ne répète pas ») + garde-fou dur.
+  const recentSpecs = existingPosts
+    .slice(0, 5)
+    .map((p) => parseVisual(p.visual, p.title, p.slug));
+
   try {
     const generated = await generateMarketingPost({
       brief: body.brief?.trim() || undefined,
@@ -64,7 +74,9 @@ export async function POST(req: NextRequest) {
       existingTitles: existingPosts.map((p) => p.title),
       learnings,
       performanceBrief: perfBrief,
+      recentVisuals: recentSpecs.map(describeVisual),
     });
+    generated.visual = diversifyVisual(generated.visual, recentSpecs);
 
     const post = await createPost({
       title: generated.title,

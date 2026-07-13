@@ -4,6 +4,7 @@ import { computeStats, statsSummaryForAi } from "./stats";
 import { refreshLearnings, topLearnings } from "./learnings";
 import { performanceBrief } from "./performance";
 import { createPost, publishPost } from "./posts";
+import { parseVisual, describeVisual, diversifyVisual } from "./visual";
 import { getSettings } from "./settings";
 import { logAction } from "./actions";
 import { sendEmail, emailShell, button } from "./email";
@@ -43,11 +44,20 @@ export async function runMarketingCycle(origin: string): Promise<CycleResult> {
 
   // 2. Rédaction, guidée par les apprentissages ET les performances réelles
   const [existingPosts, learnings, perfBrief, defaultAsset] = await Promise.all([
-    prisma.post.findMany({ select: { title: true }, orderBy: { createdAt: "desc" }, take: 15 }),
+    prisma.post.findMany({
+      select: { title: true, slug: true, visual: true },
+      orderBy: { createdAt: "desc" },
+      take: 15,
+    }),
     topLearnings(),
     performanceBrief(),
     prisma.qrCode.findFirst({ orderBy: { createdAt: "asc" } }),
   ]);
+
+  // Visuels récents : fournis à l'IA (« ne répète pas ») + garde-fou dur.
+  const recentSpecs = existingPosts
+    .slice(0, 5)
+    .map((p) => parseVisual(p.visual, p.title, p.slug));
 
   const generated = await generateMarketingPost({
     statsSummary: stats.period > 0 ? summary : undefined,
@@ -55,7 +65,9 @@ export async function runMarketingCycle(origin: string): Promise<CycleResult> {
     existingTitles: existingPosts.map((p) => p.title),
     learnings,
     performanceBrief: perfBrief,
+    recentVisuals: recentSpecs.map(describeVisual),
   });
+  generated.visual = diversifyVisual(generated.visual, recentSpecs);
 
   const draft = await createPost({
     title: generated.title,

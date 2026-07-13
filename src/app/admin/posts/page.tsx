@@ -143,6 +143,7 @@ export default function PostsPage() {
                   className="text-left text-xs border-b"
                   style={{ color: "var(--text-muted)", borderColor: "var(--grid)" }}
                 >
+                  <th className="py-2 pr-3 font-medium">Visuel</th>
                   <th className="py-2 pr-3 font-medium">Titre</th>
                   <th className="py-2 pr-3 font-medium">Campagne</th>
                   <th className="py-2 pr-3 font-medium">Statut</th>
@@ -154,6 +155,18 @@ export default function PostsPage() {
               <tbody>
                 {posts.map((post) => (
                   <tr key={post.id} className="border-b" style={{ borderColor: "var(--grid)" }}>
+                    <td className="py-2 pr-3">
+                      <Link href={`/admin/posts/${post.id}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`/api/og/${post.slug}`}
+                          alt=""
+                          loading="lazy"
+                          className="rounded border"
+                          style={{ width: 96, height: 50, objectFit: "cover", borderColor: "var(--border)" }}
+                        />
+                      </Link>
+                    </td>
                     <td className="py-2.5 pr-3 font-medium max-w-xs truncate">
                       {post.aiGenerated ? "✨ " : ""}
                       {post.title}

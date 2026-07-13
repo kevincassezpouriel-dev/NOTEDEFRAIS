@@ -3,8 +3,9 @@
  * (ou par vous dans l'éditeur). Le rendu est fait par /api/og/{slug} avec
  * l'identité de marque — la charte (couleurs, logo, typo) reste VERROUILLÉE,
  * mais chaque post combine librement gabarit, style de fond, couleur d'accent
- * (piochée dans la palette) et mode → des visuels vraiment différents d'un
- * post à l'autre.
+ * (piochée dans la palette), motif illustré et mode → des visuels vraiment
+ * différents d'un post à l'autre. `diversifyVisual` garantit en plus qu'un
+ * nouveau post ne répète jamais la combinaison des posts récents.
  */
 export type Template =
   | "annonce"
@@ -14,7 +15,9 @@ export type Template =
   | "duo"
   | "checklist"
   | "punch"
-  | "temoignage";
+  | "temoignage"
+  | "match"
+  | "meme";
 
 export type BgStyle =
   | "auto"
@@ -23,7 +26,24 @@ export type BgStyle =
   | "blobs"
   | "dots"
   | "rings"
-  | "waves";
+  | "waves"
+  | "pattern";
+
+/** Motifs illustrés (dessinés en SVG par le moteur, aux couleurs de la marque). */
+export type Motif =
+  | "aucun"
+  | "maison"
+  | "coeur"
+  | "cle"
+  | "bulle"
+  | "eclair"
+  | "etoile"
+  | "puzzle"
+  | "pin"
+  | "soleil"
+  | "plante"
+  | "tasse"
+  | "fusee";
 
 export interface VisualSpec {
   template: Template;
@@ -32,6 +52,7 @@ export interface VisualSpec {
   accentIndex: number; // index de la couleur d'accent dans la palette de marque
   mode: "sombre" | "clair";
   bg: BgStyle; // style de fond graphique (auto = choisi automatiquement, varié)
+  motif: Motif; // illustration de marque intégrée à la composition
   bgImage?: string | null; // photo/visuel/meme en arrière-plan (data-URL ou URL http)
   seed?: number; // graine de variation (dérivée du slug si absente)
 }
@@ -45,6 +66,8 @@ export const TEMPLATES: { value: Template; label: string }[] = [
   { value: "checklist", label: "Checklist (points clés)" },
   { value: "punch", label: "Punchline plein cadre" },
   { value: "temoignage", label: "Témoignage (avis + étoiles)" },
+  { value: "match", label: "Carte de match (façon app)" },
+  { value: "meme", label: "Meme (motif géant + texte choc)" },
 ];
 
 export const BG_STYLES: { value: BgStyle; label: string }[] = [
@@ -55,9 +78,28 @@ export const BG_STYLES: { value: BgStyle; label: string }[] = [
   { value: "dots", label: "Trame de points" },
   { value: "rings", label: "Cercles concentriques" },
   { value: "waves", label: "Vagues" },
+  { value: "pattern", label: "Motif répété (papier peint)" },
+];
+
+export const MOTIFS: { value: Motif; label: string }[] = [
+  { value: "aucun", label: "Aucun" },
+  { value: "maison", label: "🏠 Maison" },
+  { value: "coeur", label: "❤️ Cœur" },
+  { value: "cle", label: "🔑 Clé" },
+  { value: "bulle", label: "💬 Bulle de chat" },
+  { value: "eclair", label: "⚡ Éclair" },
+  { value: "etoile", label: "⭐ Étoile" },
+  { value: "puzzle", label: "🧩 Puzzle" },
+  { value: "pin", label: "📍 Épingle" },
+  { value: "soleil", label: "☀️ Soleil" },
+  { value: "plante", label: "🌱 Plante" },
+  { value: "tasse", label: "☕ Tasse" },
+  { value: "fusee", label: "🚀 Fusée" },
 ];
 
 const ALL_TEMPLATES: Template[] = TEMPLATES.map((t) => t.value);
+const ALL_MOTIFS: Motif[] = MOTIFS.filter((m) => m.value !== "aucun").map((m) => m.value);
+const CONCRETE_BGS: BgStyle[] = BG_STYLES.filter((b) => b.value !== "auto").map((b) => b.value);
 
 /** Hash déterministe d'une chaîne (variation stable par slug). */
 export function hashString(s: string): number {
@@ -78,6 +120,7 @@ export function defaultVisual(title: string): VisualSpec {
     accentIndex: seed % 6,
     mode: seed % 3 === 0 ? "clair" : "sombre",
     bg: "auto",
+    motif: ALL_MOTIFS[seed % ALL_MOTIFS.length],
     bgImage: null,
     seed,
   };
@@ -116,10 +159,71 @@ export function parseVisual(
       accentIndex,
       mode: v.mode === "clair" ? "clair" : "sombre",
       bg: BG_STYLES.some((b) => b.value === v.bg) ? (v.bg as BgStyle) : "auto",
+      motif: MOTIFS.some((m) => m.value === v.motif) ? (v.motif as Motif) : fallback.motif,
       bgImage,
       seed: typeof v.seed === "number" ? v.seed : fallback.seed,
     };
   } catch {
     return fallback;
   }
+}
+
+/** Résumé court d'un visuel (pour informer l'IA de ce qui a déjà été fait). */
+export function describeVisual(v: VisualSpec): string {
+  return `${v.template} / fond ${v.bg} / accent ${v.accentIndex} / ${v.mode}${
+    v.motif !== "aucun" ? ` / motif ${v.motif}` : ""
+  }`;
+}
+
+/**
+ * GARDE-FOU ANTI-MONOTONIE : ajuste un visuel fraîchement généré pour qu'il
+ * soit réellement différent des visuels récents, même si l'IA a rejoué la
+ * même recette. Règles :
+ *  - gabarit déjà utilisé dans les 2 derniers posts → gabarit le moins
+ *    utilisé récemment (hors match/meme, qui exigent des textes dédiés) ;
+ *  - même accent que le post précédent → accent suivant de la palette ;
+ *  - même style de fond que le post précédent → style suivant ;
+ *  - même mode 3 fois de suite → on inverse ;
+ *  - même motif que le post précédent → motif suivant.
+ */
+export function diversifyVisual(spec: VisualSpec, recent: VisualSpec[]): VisualSpec {
+  const out = { ...spec };
+  const last = recent[0];
+
+  if (recent.slice(0, 2).some((r) => r.template === out.template)) {
+    const counts = new Map<Template, number>(ALL_TEMPLATES.map((t) => [t, 0]));
+    for (const r of recent) counts.set(r.template, (counts.get(r.template) ?? 0) + 1);
+    counts.delete(out.template);
+    counts.delete("match");
+    counts.delete("meme");
+    let best: Template = "annonce";
+    let bestCount = Infinity;
+    for (const [t, c] of counts) {
+      if (c < bestCount) {
+        best = t;
+        bestCount = c;
+      }
+    }
+    out.template = best;
+  }
+
+  if (last && last.accentIndex === out.accentIndex) {
+    out.accentIndex = out.accentIndex + 1;
+  }
+
+  if (last && last.bg !== "auto" && last.bg === out.bg) {
+    const i = CONCRETE_BGS.indexOf(out.bg);
+    out.bg = CONCRETE_BGS[(i + 1) % CONCRETE_BGS.length];
+  }
+
+  if (recent.length >= 3 && recent.slice(0, 3).every((r) => r.mode === out.mode)) {
+    out.mode = out.mode === "sombre" ? "clair" : "sombre";
+  }
+
+  if (last && last.motif === out.motif) {
+    const i = ALL_MOTIFS.indexOf(out.motif);
+    out.motif = ALL_MOTIFS[(i + 1) % ALL_MOTIFS.length];
+  }
+
+  return out;
 }
