@@ -21,6 +21,7 @@ interface Brand {
   palette: string[];
   typography: Typography;
   logo: string | null;
+  assets: { name: string; data: string }[];
 }
 
 const DEFAULT_NEW_COLOR = "#28c7a3";
@@ -53,6 +54,29 @@ async function fileToLogo(file: File): Promise<string> {
   c.height = Math.round(img.height * scale);
   c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
   return c.toDataURL("image/png");
+}
+
+/** Réduit une image de bibliothèque en JPEG ≤ 1280 px (data-URL). */
+async function fileToAsset(file: File): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = reject;
+    i.src = dataUrl;
+  });
+  const max = 1280;
+  const scale = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * scale);
+  c.height = Math.round(img.height * scale);
+  c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.8);
 }
 
 export default function MarquePage() {
@@ -304,6 +328,65 @@ export default function MarquePage() {
               </button>
             </div>
           </div>
+        </section>
+
+        {/* Bibliothèque d'images de marque */}
+        <section className="space-y-3 border-t pt-4" style={{ borderColor: "var(--grid)" }}>
+          <h2 className="text-sm font-semibold">Bibliothèque d&apos;images de marque</h2>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Screens de l&apos;app, photos produit, ambiances… L&apos;IA et toi pouvez les
+            poser en fond de n&apos;importe quel visuel (texte et charte composés
+            par-dessus). Max 8 images.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {brand.assets.map((a, i) => (
+              <div key={i} className="w-28">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={a.data} alt={a.name} className="w-28 h-20 object-cover rounded border"
+                  style={{ borderColor: "var(--border)" }} />
+                <div className="flex items-center gap-1 mt-1">
+                  <input
+                    className="input !py-0.5 text-xs flex-1"
+                    value={a.name}
+                    onChange={(e) => {
+                      const assets = [...brand.assets];
+                      assets[i] = { ...assets[i], name: e.target.value };
+                      setBrand({ ...brand, assets });
+                    }}
+                  />
+                  <button type="button" aria-label="Retirer"
+                    className="text-xs w-5 h-5 rounded-full leading-none shrink-0"
+                    style={{ background: "var(--page)", color: "var(--text-muted)" }}
+                    onClick={() => setBrand({ ...brand, assets: brand.assets.filter((_, j) => j !== i) })}>
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {brand.assets.length < 8 && (
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="text-xs"
+              onChange={async (e) => {
+                const files = Array.from(e.target.files ?? []).slice(0, 8 - brand.assets.length);
+                if (!files.length) return;
+                try {
+                  const added = await Promise.all(
+                    files.map(async (f) => ({
+                      name: f.name.replace(/\.[a-z]+$/i, "").slice(0, 60),
+                      data: await fileToAsset(f),
+                    }))
+                  );
+                  setBrand({ ...brand, assets: [...brand.assets, ...added] });
+                } catch {
+                  setMessage({ text: "Impossible de lire ces images", error: true });
+                }
+              }}
+            />
+          )}
         </section>
 
         {message && (

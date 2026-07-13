@@ -146,6 +146,11 @@ const POST_SCHEMA = {
           enum: ["sombre", "clair"],
           description: "Fond sombre (impactant) ou clair (léger) selon le ton du post",
         },
+        bgAsset: {
+          type: "integer" as const,
+          description:
+            "Index (0+) d'une image de la bibliothèque de marque à poser en fond du visuel de couverture (la liste des images disponibles est fournie dans le brief), ou -1 pour aucune. Utilise un screen de l'app quand le post parle du produit.",
+        },
         slides: {
           type: "array" as const,
           description:
@@ -167,7 +172,7 @@ const POST_SCHEMA = {
           },
         },
       },
-      required: ["template", "headline", "subline", "accentIndex", "bg", "motif", "mode", "slides"],
+      required: ["template", "headline", "subline", "accentIndex", "bg", "motif", "mode", "bgAsset", "slides"],
       additionalProperties: false,
     },
   },
@@ -194,6 +199,9 @@ export async function generateMarketingPost(opts: {
   learnings?: string[];
   performanceBrief?: string;
   recentVisuals?: string[];
+  /** Recherche web AVANT d'écrire : posts factuels (lieux réels, adresses,
+   *  chiffres sourcés). Coût : ~10 $ / 1000 recherches + tokens. */
+  research?: boolean;
 }): Promise<GeneratedPost> {
   const parts: string[] = [];
   if (opts.brief) {
@@ -238,6 +246,18 @@ export async function generateMarketingPost(opts: {
   }
 
   const brand = await getBrand();
+  if (brand.assets?.length) {
+    parts.push(
+      `Images de la bibliothèque de marque disponibles pour le fond du visuel (champ bgAsset) :\n${brand.assets
+        .map((a, i) => `${i} = ${a.name}`)
+        .join("\n")}\n(-1 si aucune ne convient)`
+    );
+  }
+  if (opts.research) {
+    parts.unshift(
+      `MODE RECHERCHE : avant d'écrire, utilise la recherche web pour réunir des FAITS RÉELS et ACTUELS (noms exacts, adresses, prix, chiffres, dates). Le post — et chaque slide du carrousel — doit reposer sur ces faits vérifiés : par exemple pour « les meilleurs restaurants où aller entre colocs à Paris », chaque slide = un restaurant réel avec son nom, son adresse et pourquoi il est parfait entre colocs. N'invente RIEN de factuel ; si tes recherches ne confirment pas une info, ne la publie pas.`
+    );
+  }
   const response = await client().messages.create({
     model: MODEL_WRITE,
     max_tokens: 16000,
@@ -247,14 +267,18 @@ export async function generateMarketingPost(opts: {
       { type: "text", text: buildBrandSystem(brand) },
       { type: "text", text: PLAYBOOK, cache_control: { type: "ephemeral" } },
     ],
-    ...reqOpts(MODEL_WRITE, "medium", POST_SCHEMA),
+    ...reqOpts(MODEL_WRITE, opts.research ? "high" : "medium", POST_SCHEMA),
+    ...(opts.research
+      ? { tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }] }
+      : {}),
     messages: [{ role: "user", content: parts.join("\n\n") }],
   } as Anthropic.Messages.MessageCreateParamsNonStreaming);
 
   if (response.stop_reason === "refusal") {
     throw new Error("La génération a été refusée par le modèle.");
   }
-  const text = response.content.find((b) => b.type === "text")?.text ?? "";
+  const textBlocks = response.content.filter((b) => b.type === "text");
+  const text = textBlocks[textBlocks.length - 1]?.text ?? "";
   const parsed = JSON.parse(text) as Omit<GeneratedPost, "slug">;
   return { ...parsed, slug: slugify(parsed.title) };
 }

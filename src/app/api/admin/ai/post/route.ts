@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     qrCodeId?: string;
     campaignId?: string;
     useStats?: boolean;
+    research?: boolean;
   };
 
   const [qr, campaign] = await Promise.all([
@@ -75,6 +76,7 @@ export async function POST(req: NextRequest) {
       learnings,
       performanceBrief: perfBrief,
       recentVisuals: recentSpecs.map(describeVisual),
+      research: body.research === true,
     });
     generated.visual = diversifyVisual(generated.visual, recentSpecs);
 

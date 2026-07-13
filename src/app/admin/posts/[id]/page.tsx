@@ -53,6 +53,7 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
   const [post, setPost] = useState<PostDetail | null>(null);
   const [visual, setVisual] = useState<VisualSpec | null>(null);
   const [pool, setPool] = useState<string[]>([]); // palette d'accents (couleurs de marque)
+  const [assets, setAssets] = useState<{ name: string; data: string }[]>([]); // bibliothèque de marque
   const [visualVersion, setVisualVersion] = useState(0); // force le refresh de l'aperçu
   const [qrcodes, setQrcodes] = useState<Option[]>([]);
   const [campaigns, setCampaigns] = useState<Option[]>([]);
@@ -79,7 +80,9 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
         colorPrimary: string;
         colorSecondary: string;
         palette?: string[];
+        assets?: { name: string; data: string }[];
       };
+      setAssets(b.assets ?? []);
       const all = [b.colorPrimary, b.colorSecondary, ...(b.palette ?? [])]
         .map((c) => (c || "").toLowerCase())
         .filter((c) => /^#[0-9a-f]{6}$/.test(c));
@@ -391,6 +394,33 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
                 />
               </div>
             </div>
+            {assets.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium mb-1">
+                  Ou une image de la bibliothèque de marque
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {assets.map((a, i) => {
+                    const on = visual.bgAsset === i && !visual.bgImage;
+                    return (
+                      <button key={i} type="button" title={a.name}
+                        onClick={() =>
+                          setVisual({ ...visual, bgAsset: on ? undefined : i, bgImage: null })
+                        }
+                        style={{
+                          border: on ? "3px solid var(--accent)" : "1px solid var(--border)",
+                          borderRadius: 8, padding: 0, overflow: "hidden", cursor: "pointer",
+                          background: "transparent",
+                        }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={a.data} alt={a.name} style={{ width: 72, height: 44, objectFit: "cover", display: "block" }} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Carrousel : le format n°1 en engagement (voir playbook) */}
             <div className="border-t pt-3 space-y-2" style={{ borderColor: "var(--grid)" }}>
               <p className="text-xs font-medium">

@@ -80,6 +80,10 @@ export async function GET(
 
   const brand = await getBrand();
   const visual = parseVisual(post.visual, post.title, slug);
+  // Image de la bibliothèque de marque posée en fond (si pas d'image dédiée)
+  if (!visual.bgImage && visual.bgAsset !== undefined) {
+    visual.bgImage = brand.assets?.[visual.bgAsset]?.data ?? null;
+  }
   // Sans les polices embarquées, le rendu retombe sur la police système.
   const fonts = await loadFonts(req.nextUrl.origin).catch(() => []);
 

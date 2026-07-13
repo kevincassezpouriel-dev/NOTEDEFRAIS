@@ -27,6 +27,7 @@ export default function PostsPage() {
   const [qrcodes, setQrcodes] = useState<QrOption[]>([]);
   const [brief, setBrief] = useState("");
   const [qrCodeId, setQrCodeId] = useState("");
+  const [research, setResearch] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,7 +50,11 @@ export default function PostsPage() {
     const res = await fetch("/api/admin/ai/post", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brief: brief || undefined, qrCodeId: qrCodeId || undefined }),
+      body: JSON.stringify({
+        brief: brief || undefined,
+        qrCodeId: qrCodeId || undefined,
+        research,
+      }),
     });
     setGenerating(false);
     if (res.ok) {
@@ -114,9 +119,15 @@ export default function PostsPage() {
             ))}
           </select>
           <button onClick={generate} className="btn btn-primary" disabled={generating}>
-            {generating ? "Génération… (~30 s)" : "✨ Générer un brouillon"}
+            {generating ? (research ? "Recherche + rédaction… (~1 min)" : "Génération… (~30 s)") : "✨ Générer un brouillon"}
           </button>
         </div>
+        <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: "var(--text-secondary)" }}>
+          <input type="checkbox" checked={research} onChange={(e) => setResearch(e.target.checked)} />
+          🔎 <strong>Recherche web d&apos;abord</strong> — pour les posts factuels : l&apos;IA
+          cherche de vrais lieux/chiffres/actus puis compose (ex. « les meilleurs
+          restos à faire entre colocs à Paris » → carrousel avec noms et adresses réels).
+        </label>
         {error && (
           <p className="text-sm" style={{ color: "var(--critical)" }}>
             {error}

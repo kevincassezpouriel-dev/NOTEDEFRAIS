@@ -26,6 +26,9 @@ export interface BrandIdentity {
   palette: string[]; // couleurs additionnelles de la marque (hex) — ajoutables librement
   typography: Typography; // personnalité typographique des visuels
   logo: string | null; // logo en data-URL (affiché sur les visuels)
+  // Bibliothèque d'images de marque (screens de l'app, photos produit…) :
+  // utilisables en fond de visuel, par vous ou par l'IA (champ bgAsset).
+  assets: { name: string; data: string }[];
 }
 
 export const DEFAULT_BRAND: BrandIdentity = {
@@ -57,6 +60,7 @@ export const DEFAULT_BRAND: BrandIdentity = {
   palette: ["#7c5cff", "#ff9f43", "#28c7a3", "#ffd166"],
   typography: "moderne",
   logo: null,
+  assets: [],
 };
 
 /**

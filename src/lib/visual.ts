@@ -60,6 +60,7 @@ export interface VisualSpec {
   bg: BgStyle; // style de fond graphique (auto = choisi automatiquement, varié)
   motif: Motif; // illustration de marque intégrée à la composition
   bgImage?: string | null; // photo/visuel/meme en arrière-plan (data-URL ou URL http)
+  bgAsset?: number; // index d'une image de la bibliothèque de marque (-1 = aucune)
   seed?: number; // graine de variation (dérivée du slug si absente)
   // Carrousel : slides de contenu APRÈS la couverture (le visuel principal est
   // la slide 1 / hook) ; la slide CTA finale est composée automatiquement.
@@ -171,6 +172,8 @@ export function parseVisual(
       bg: BG_STYLES.some((b) => b.value === v.bg) ? (v.bg as BgStyle) : "auto",
       motif: MOTIFS.some((m) => m.value === v.motif) ? (v.motif as Motif) : fallback.motif,
       bgImage,
+      bgAsset:
+        typeof v.bgAsset === "number" && v.bgAsset >= 0 ? Math.floor(v.bgAsset) : undefined,
       seed: typeof v.seed === "number" ? v.seed : fallback.seed,
       slides: Array.isArray(v.slides)
         ? v.slides

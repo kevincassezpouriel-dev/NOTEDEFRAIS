@@ -5,6 +5,8 @@ export const dynamic = "force-dynamic";
 
 const MAX_LOGO_BYTES = 600 * 1024;
 const MAX_PALETTE = 12;
+const MAX_ASSETS = 8;
+const MAX_ASSET_BYTES = 500 * 1024;
 
 export async function GET() {
   return NextResponse.json(await getBrand());
@@ -59,6 +61,28 @@ export async function PATCH(req: NextRequest) {
     }
   }
   if (body.logo === "") body.logo = null;
+
+  if (body.assets !== undefined) {
+    if (!Array.isArray(body.assets) || body.assets.length > MAX_ASSETS) {
+      return NextResponse.json(
+        { error: `Bibliothèque invalide (max ${MAX_ASSETS} images)` },
+        { status: 400 }
+      );
+    }
+    for (const a of body.assets) {
+      if (!a || typeof a.name !== "string" || typeof a.data !== "string" ||
+          !a.data.startsWith("data:image/")) {
+        return NextResponse.json({ error: "Image de bibliothèque invalide" }, { status: 400 });
+      }
+      if (a.data.length > MAX_ASSET_BYTES * 1.4) {
+        return NextResponse.json(
+          { error: `« ${a.name} » est trop volumineuse (max 500 Ko)` },
+          { status: 400 }
+        );
+      }
+      a.name = a.name.slice(0, 60);
+    }
+  }
 
   return NextResponse.json(await setBrand(body));
 }
