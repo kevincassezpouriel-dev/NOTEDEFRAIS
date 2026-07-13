@@ -394,3 +394,102 @@ conclure, renvoie une liste vide.`,
     return [];
   }
 }
+
+const COMPETITOR_SCHEMA = {
+  type: "object" as const,
+  properties: {
+    competitor: { type: "string" as const, description: "Nom du concurrent analysé" },
+    summary: {
+      type: "string" as const,
+      description: "Synthèse (4-6 phrases) : positionnement, ton, formats, fréquence, audience visée",
+    },
+    whatWorks: {
+      type: "array" as const,
+      description: "Ce qui marche chez lui et POURQUOI (3 à 6 observations, fondées sur ce que tu as trouvé)",
+      items: {
+        type: "object" as const,
+        properties: {
+          observation: { type: "string" as const, description: "L'observation, en une phrase" },
+          why: { type: "string" as const, description: "Pourquoi ça marche (mécanisme d'engagement)" },
+        },
+        required: ["observation", "why"],
+        additionalProperties: false,
+      },
+    },
+    postIdeas: {
+      type: "array" as const,
+      description:
+        "3 à 5 idées de posts POUR NOTRE marque, inspirées de ce qui marche chez le concurrent mais adaptées à notre identité (jamais du plagiat)",
+      items: {
+        type: "object" as const,
+        properties: {
+          brief: {
+            type: "string" as const,
+            description: "Brief prêt à donner au générateur de posts (2-3 phrases : angle, format, ton)",
+          },
+          angle: { type: "string" as const, description: "L'angle en une phrase" },
+          format: {
+            type: "string" as const,
+            enum: ["carrousel", "meme", "temoignage", "stat", "annonce", "astuce"],
+            description: "Format recommandé",
+          },
+        },
+        required: ["brief", "angle", "format"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["competitor", "summary", "whatWorks", "postIdeas"],
+  additionalProperties: false,
+};
+
+export interface CompetitorAnalysis {
+  competitor: string;
+  summary: string;
+  whatWorks: { observation: string; why: string }[];
+  postIdeas: { brief: string; angle: string; format: string }[];
+}
+
+/**
+ * VEILLE CONCURRENTIELLE : analyse un concurrent (URL de page sociale, site
+ * ou simple nom) via le web public — recherches + lecture des pages
+ * accessibles — et en déduit ce qui marche chez lui + des idées de posts
+ * ADAPTÉES à notre marque. NB : les statistiques privées d'Instagram/TikTok
+ * ne sont pas accessibles ; l'analyse croise ce qui est public (contenus,
+ * presse, classements, avis).
+ */
+export async function analyzeCompetitor(input: string): Promise<CompetitorAnalysis> {
+  const brand = await getBrand();
+  const response = await client().messages.create({
+    model: MODEL_WRITE,
+    max_tokens: 16000,
+    system: [
+      { type: "text", text: buildBrandSystem(brand) },
+      { type: "text", text: PLAYBOOK, cache_control: { type: "ephemeral" } },
+    ],
+    ...reqOpts(MODEL_WRITE, "high", COMPETITOR_SCHEMA),
+    tools: [
+      { type: "web_search_20250305", name: "web_search", max_uses: 8 },
+      { type: "web_fetch_20250910", name: "web_fetch", max_uses: 5 },
+    ],
+    messages: [
+      {
+        role: "user",
+        content: `Fais une veille concurrentielle sur : ${input}
+
+Méthode :
+1. Identifie qui c'est (recherche web). Si c'est une URL, essaie de la lire (web_fetch).
+2. Étudie sa communication : angles, formats (carrousels ? memes ? témoignages ?), ton, ce que la presse/les avis/les classements en disent, ce qui semble le mieux fonctionner et POURQUOI.
+3. Déduis des idées de posts pour NOTRE marque : on s'inspire des MÉCANISMES qui marchent (pas du contenu copié), adaptés à notre identité et nos piliers.
+Si tu ne trouves pas assez d'informations fiables, dis-le dans summary et fonde les idées sur les mécanismes génériques du playbook.`,
+      },
+    ],
+  } as Anthropic.Messages.MessageCreateParamsNonStreaming);
+
+  if (response.stop_reason === "refusal") {
+    throw new Error("L'analyse a été refusée par le modèle.");
+  }
+  const blocks = response.content.filter((b) => b.type === "text");
+  const text = blocks[blocks.length - 1]?.text ?? "";
+  return JSON.parse(text) as CompetitorAnalysis;
+}
