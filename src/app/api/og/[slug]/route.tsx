@@ -23,9 +23,10 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const square = req.nextUrl.searchParams.get("format") === "carre";
-  const width = square ? 1080 : 1200;
-  const height = square ? 1080 : 630;
+  // bannière 1200×630 (défaut) · carré 1080×1080 (feed) · story 1080×1920
+  const fmt = req.nextUrl.searchParams.get("format");
+  const [width, height] =
+    fmt === "carre" ? [1080, 1080] : fmt === "story" ? [1080, 1920] : [1200, 630];
 
   const post = await prisma.post.findUnique({
     where: { slug },

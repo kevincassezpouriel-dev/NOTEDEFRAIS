@@ -200,9 +200,27 @@ export default function PostsPage() {
                     <td className="py-2.5 pr-3 text-right tabular-nums">{post.clicks}</td>
                     <td className="py-2.5 pr-3 text-right tabular-nums">{post.installs}</td>
                     <td className="py-2.5 text-right">
-                      <Link href={`/admin/posts/${post.id}`} className="btn btn-secondary !py-1">
-                        Éditer
-                      </Link>
+                      <span className="inline-flex gap-1.5">
+                        {post.status === "published" && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary !py-1"
+                            title="Recycler : recrée ce post en brouillon avec un visuel recomposé (rediffusion evergreen)"
+                            onClick={async () => {
+                              const res = await fetch(`/api/admin/posts/${post.id}/recycle`, { method: "POST" });
+                              if (res.ok) {
+                                const draft = await res.json();
+                                window.location.href = `/admin/posts/${draft.id}`;
+                              }
+                            }}
+                          >
+                            ♻️
+                          </button>
+                        )}
+                        <Link href={`/admin/posts/${post.id}`} className="btn btn-secondary !py-1">
+                          Éditer
+                        </Link>
+                      </span>
                     </td>
                   </tr>
                 ))}

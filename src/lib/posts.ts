@@ -3,7 +3,7 @@ import { prisma } from "./prisma";
 import { notifySocialWebhook } from "./webhook";
 import { postUtmSource } from "./attribution";
 import { logAction } from "./actions";
-import { defaultVisual, type VisualSpec } from "./visual";
+import { defaultVisual, parseVisual, diversifyVisual, hashString, type VisualSpec } from "./visual";
 
 /** Suffixe -2, -3… si le slug est déjà pris. */
 export async function uniquePostSlug(base: string): Promise<string> {
@@ -73,6 +73,49 @@ export async function publishPost(postId: string, siteUrl: string): Promise<Post
     campaignId: post.campaignId,
     refType: "post",
     refId: post.id,
+  });
+  return post;
+}
+
+/**
+ * RECYCLAGE EVERGREEN (principe SocialBee/CoSchedule « ReQueue ») : duplique
+ * un post qui a bien marché en un nouveau brouillon prêt à republier —
+ * même contenu, mais slug, utm_source (attribution propre) et VISUEL
+ * neufs : le visuel est re-composé avec une autre combinaison
+ * gabarit/fond/accent/motif pour que la rediffusion ne ressemble pas à un
+ * copier-coller.
+ */
+export async function recyclePost(postId: string): Promise<Post> {
+  const source = await prisma.post.findUnique({ where: { id: postId } });
+  if (!source) throw new Error("Post introuvable");
+
+  const sourceVisual = parseVisual(source.visual, source.title, source.slug);
+  const freshSeed = hashString(`${source.slug}-${Date.now()}`);
+  const recycledVisual: VisualSpec = diversifyVisual(
+    { ...sourceVisual, seed: freshSeed, bgImage: null },
+    [sourceVisual]
+  );
+
+  const post = await createPost({
+    title: source.title,
+    slug: source.slug,
+    content: source.content,
+    excerpt: source.excerpt,
+    hashtags: source.hashtags,
+    qrCodeId: source.qrCodeId,
+    campaignId: source.campaignId,
+    aiGenerated: source.aiGenerated,
+    visual: recycledVisual,
+  });
+  await logAction({
+    type: "post.recycled",
+    actor: "human",
+    title: `Post recyclé : « ${source.title} »`,
+    detail: "Rediffusion créée en brouillon avec un visuel recomposé.",
+    campaignId: post.campaignId,
+    refType: "post",
+    refId: post.id,
+    status: "done",
   });
   return post;
 }

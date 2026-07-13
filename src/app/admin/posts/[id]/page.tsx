@@ -392,15 +392,15 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
               </div>
             </div>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              Formats fournis aux réseaux : 1200×630 (partages) et 1080×1080 (Instagram,{" "}
-              <a
-                href={`/api/og/${post.slug}?format=carre`}
-                target="_blank"
-                className="underline"
-              >
-                voir le carré ↗
-              </a>
-              ).
+              Formats fournis aux réseaux : 1200×630 (partages) ·{" "}
+              <a href={`/api/og/${post.slug}?format=carre`} target="_blank" className="underline">
+                carré 1080×1080 ↗
+              </a>{" "}
+              (feed Instagram) ·{" "}
+              <a href={`/api/og/${post.slug}?format=story`} target="_blank" className="underline">
+                story 1080×1920 ↗
+              </a>{" "}
+              (stories, TikTok).
             </p>
           </div>
         )}
@@ -507,6 +507,32 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
                 value={scheduledAt}
                 onChange={(e) => setScheduledAt(e.target.value)}
               />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                title="Remplit avec le prochain créneau où ton audience est la plus active (analyse des scans réels)"
+                onClick={async () => {
+                  const res = await fetch("/api/admin/besttime", { cache: "no-store" });
+                  if (!res.ok) return;
+                  const bt = (await res.json()) as {
+                    slots: { label: string; nextAt: string }[];
+                    estimated: boolean;
+                  };
+                  const best = bt.slots[0];
+                  if (!best) return;
+                  const d = new Date(best.nextAt);
+                  const pad = (n: number) => String(n).padStart(2, "0");
+                  setScheduledAt(
+                    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+                  );
+                  setMessage({
+                    text: `🕐 Meilleur créneau proposé : ${best.label}${bt.estimated ? " (estimation — pas encore assez de données)" : " (calculé sur ton audience réelle)"}.`,
+                    error: false,
+                  });
+                }}
+              >
+                🕐 Meilleur créneau
+              </button>
               <button
                 type="button"
                 className="btn btn-secondary"

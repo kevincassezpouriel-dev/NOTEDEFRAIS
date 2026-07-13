@@ -21,16 +21,27 @@ function dateKey(d: Date): string {
 
 /** Calendrier éditorial : tous les posts placés sur leur date de
  *  publication (réelle ou programmée) ; les brouillons à planifier à part. */
+interface BestTimesInfo {
+  slots: { label: string; score: number }[];
+  basedOn: number;
+  estimated: boolean;
+}
+
 export default function CalendrierPage() {
   const [posts, setPosts] = useState<PostRow[]>([]);
+  const [bestTimes, setBestTimes] = useState<BestTimesInfo | null>(null);
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/admin/posts", { cache: "no-store" });
+    const [res, btRes] = await Promise.all([
+      fetch("/api/admin/posts", { cache: "no-store" }),
+      fetch("/api/admin/besttime", { cache: "no-store" }),
+    ]);
     if (res.ok) setPosts(await res.json());
+    if (btRes.ok) setBestTimes(await btRes.json());
   }, []);
 
   useEffect(() => {
@@ -84,6 +95,31 @@ export default function CalendrierPage() {
           </button>
         </div>
       </div>
+
+      {/* Meilleurs créneaux (principe Buffer/Later : quand l'audience est là) */}
+      {bestTimes && (
+        <div className="card p-4">
+          <p className="text-sm font-semibold mb-1">🕐 Meilleurs créneaux pour publier</p>
+          <div className="flex flex-wrap items-center gap-2">
+            {bestTimes.slots.map((s, i) => (
+              <span
+                key={i}
+                className="text-xs px-2.5 py-1 rounded-full font-medium"
+                style={{ background: "var(--grid)", color: "var(--text-primary)" }}
+              >
+                {i === 0 ? "⭐ " : ""}
+                {s.label}
+                {!bestTimes.estimated && s.score > 0 ? ` · ${s.score} interactions` : ""}
+              </span>
+            ))}
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {bestTimes.estimated
+                ? "Estimation type audience jeune — se précisera avec tes vrais scans."
+                : `Calculé sur ${bestTimes.basedOn} interactions réelles (60 derniers jours).`}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-4 text-xs" style={{ color: "var(--text-secondary)" }}>
         <span className="flex items-center gap-1.5">

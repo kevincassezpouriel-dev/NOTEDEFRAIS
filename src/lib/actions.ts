@@ -5,6 +5,7 @@ export type ActionType =
   | "post.generated"
   | "post.published"
   | "post.scheduled"
+  | "post.recycled"
   | "analysis.run"
   | "learning.saved"
   | "autopilot.run"
