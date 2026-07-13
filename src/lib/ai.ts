@@ -493,3 +493,114 @@ Si tu ne trouves pas assez d'informations fiables, dis-le dans summary et fonde 
   const text = blocks[blocks.length - 1]?.text ?? "";
   return JSON.parse(text) as CompetitorAnalysis;
 }
+
+const INSPIRE_SCHEMA = {
+  type: "object" as const,
+  properties: {
+    rationale: {
+      type: "string" as const,
+      description:
+        "En 1-2 phrases : ce que tu as retenu de l'image de référence (composition, ambiance, hiérarchie) et comment tu l'as traduit dans notre système",
+    },
+    template: {
+      type: "string" as const,
+      enum: [
+        "annonce", "astuce", "stat", "citation", "duo",
+        "checklist", "punch", "temoignage", "match", "meme", "app",
+      ],
+      description: "Le gabarit de NOTRE moteur le plus proche de la structure de la référence",
+    },
+    headline: {
+      type: "string" as const,
+      description:
+        "Accroche pour NOTRE post (max 60 caractères), dans l'esprit éditorial de la référence mais avec notre message — ne copie JAMAIS le texte de l'image",
+    },
+    subline: { type: "string" as const, description: "Ligne secondaire (max 90 caractères, ou vide)" },
+    accentIndex: {
+      type: "integer" as const,
+      description: "Index dans notre palette dont la teinte se rapproche le plus de l'ambiance de la référence",
+    },
+    bg: {
+      type: "string" as const,
+      enum: ["auto", "mesh", "diagonal", "blobs", "dots", "rings", "waves", "pattern"],
+      description: "Le style de fond de notre moteur le plus proche de la texture/du fond de la référence",
+    },
+    motif: {
+      type: "string" as const,
+      enum: ["aucun", "maison", "coeur", "cle", "bulle", "eclair", "etoile", "puzzle", "pin", "soleil", "plante", "tasse", "fusee"],
+      description: "Motif cohérent avec l'imagerie de la référence",
+    },
+    mode: {
+      type: "string" as const,
+      enum: ["sombre", "clair"],
+      description: "Selon la luminosité générale de la référence",
+    },
+  },
+  required: ["rationale", "template", "headline", "subline", "accentIndex", "bg", "motif", "mode"],
+  additionalProperties: false,
+};
+
+export interface InspireResult {
+  rationale: string;
+  template: string;
+  headline: string;
+  subline: string;
+  accentIndex: number;
+  bg: string;
+  motif: string;
+  mode: string;
+}
+
+/**
+ * INSPIRATION PAR IMAGE (vision) : on lui montre un rendu qui te plaît
+ * (Pinterest, post d'une autre marque…) → Claude analyse sa composition,
+ * son ambiance et sa hiérarchie, puis la TRADUIT dans notre système de
+ * gabarits, aux couleurs de notre charte, avec notre message. Jamais de
+ * copie : on reprend la grammaire visuelle, pas le contenu.
+ */
+export async function inspireVisual(
+  imageDataUrl: string,
+  post: { title: string; excerpt?: string | null }
+): Promise<InspireResult> {
+  const match = imageDataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,(.+)$/);
+  if (!match) throw new Error("Image de référence invalide (PNG/JPEG/WebP attendu).");
+  const [, mediaType, data] = match;
+
+  const brand = await getBrand();
+  const pool = [brand.colorPrimary, brand.colorSecondary, ...(brand.palette ?? [])];
+  const response = await client().messages.create({
+    model: MODEL_WRITE,
+    max_tokens: 4000,
+    system: [{ type: "text", text: buildBrandSystem(brand), cache_control: { type: "ephemeral" } }],
+    ...reqOpts(MODEL_WRITE, "medium", INSPIRE_SCHEMA),
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: mediaType as "image/png", data },
+          },
+          {
+            type: "text",
+            text: `Voici une image de référence dont l'esthétique nous plaît.
+Analyse sa composition (structure, hiérarchie du texte, densité), son ambiance
+(clair/sombre, énergie) et son intention éditoriale, puis traduis-la dans NOTRE
+système pour le post suivant :
+Titre du post : ${post.title}
+${post.excerpt ? `Accroche : ${post.excerpt}` : ""}
+Notre palette d'accents (index) : ${pool.map((c, i) => `${i}=${c}`).join(", ")}
+Règles : on reprend la GRAMMAIRE visuelle (structure, ambiance), jamais le texte
+ni les éléments propres à l'autre marque. L'accroche produite porte NOTRE message.`,
+          },
+        ],
+      },
+    ],
+  } as Anthropic.Messages.MessageCreateParamsNonStreaming);
+
+  if (response.stop_reason === "refusal") {
+    throw new Error("L'analyse de l'image a été refusée par le modèle.");
+  }
+  const blocks = response.content.filter((b) => b.type === "text");
+  return JSON.parse(blocks[blocks.length - 1]?.text ?? "") as InspireResult;
+}

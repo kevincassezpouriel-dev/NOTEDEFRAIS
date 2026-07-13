@@ -352,6 +352,46 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
                 >
                   ✨ Générer une image (IA)
                 </button>
+                <label className="btn btn-secondary !py-1 text-xs cursor-pointer">
+                  🎨 S&apos;inspirer d&apos;une image…
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      e.target.value = "";
+                      setBusy(true);
+                      setMessage({ text: "🎨 Analyse de la référence… (~20 s)", error: false });
+                      try {
+                        const image = await fileToBg(file);
+                        const res = await fetch("/api/admin/ai/inspire", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ postId: id, image }),
+                        });
+                        setBusy(false);
+                        if (res.ok) {
+                          const data = (await res.json()) as {
+                            post: PostDetail;
+                            rationale: string;
+                          };
+                          setPost(data.post);
+                          setVisual(parseVisual(data.post.visual, data.post.title, data.post.slug));
+                          setVisualVersion((v) => v + 1);
+                          setMessage({ text: `✓ Traduit dans ta charte — ${data.rationale}`, error: false });
+                        } else {
+                          const b = await res.json().catch(() => null);
+                          setMessage({ text: b?.error ?? "Échec de l'analyse", error: true });
+                        }
+                      } catch {
+                        setBusy(false);
+                        setMessage({ text: "Impossible de lire cette image", error: true });
+                      }
+                    }}
+                  />
+                </label>
                 {visual.bgImage && (
                   <button
                     type="button"
