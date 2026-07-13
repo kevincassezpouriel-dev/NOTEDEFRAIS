@@ -17,7 +17,8 @@ export type Template =
   | "punch"
   | "temoignage"
   | "match"
-  | "meme";
+  | "meme"
+  | "app";
 
 export type BgStyle =
   | "auto"
@@ -45,6 +46,11 @@ export type Motif =
   | "tasse"
   | "fusee";
 
+export interface CarouselSlide {
+  headline: string; // une idée par slide (≤ 90 caractères)
+  subline: string; // développement court (≤ 130 caractères, peut être vide)
+}
+
 export interface VisualSpec {
   template: Template;
   headline: string; // punchline courte affichée sur l'image (≤ 90 caractères)
@@ -55,6 +61,9 @@ export interface VisualSpec {
   motif: Motif; // illustration de marque intégrée à la composition
   bgImage?: string | null; // photo/visuel/meme en arrière-plan (data-URL ou URL http)
   seed?: number; // graine de variation (dérivée du slug si absente)
+  // Carrousel : slides de contenu APRÈS la couverture (le visuel principal est
+  // la slide 1 / hook) ; la slide CTA finale est composée automatiquement.
+  slides?: CarouselSlide[];
 }
 
 export const TEMPLATES: { value: Template; label: string }[] = [
@@ -68,6 +77,7 @@ export const TEMPLATES: { value: Template; label: string }[] = [
   { value: "temoignage", label: "Témoignage (avis + étoiles)" },
   { value: "match", label: "Carte de match (façon app)" },
   { value: "meme", label: "Meme (motif géant + texte choc)" },
+  { value: "app", label: "Vitrine app (mockup téléphone)" },
 ];
 
 export const BG_STYLES: { value: BgStyle; label: string }[] = [
@@ -162,6 +172,15 @@ export function parseVisual(
       motif: MOTIFS.some((m) => m.value === v.motif) ? (v.motif as Motif) : fallback.motif,
       bgImage,
       seed: typeof v.seed === "number" ? v.seed : fallback.seed,
+      slides: Array.isArray(v.slides)
+        ? v.slides
+            .filter((sl) => sl && typeof sl.headline === "string")
+            .slice(0, 8)
+            .map((sl) => ({
+              headline: sl.headline.slice(0, 100),
+              subline: (sl.subline ?? "").slice(0, 140),
+            }))
+        : undefined,
     };
   } catch {
     return fallback;
@@ -196,6 +215,7 @@ export function diversifyVisual(spec: VisualSpec, recent: VisualSpec[]): VisualS
     counts.delete(out.template);
     counts.delete("match");
     counts.delete("meme");
+    counts.delete("app");
     let best: Template = "annonce";
     let bestCount = Infinity;
     for (const [t, c] of counts) {

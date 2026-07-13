@@ -61,7 +61,16 @@ export async function GET(
   // bannière 1200×630 (défaut) · carré 1080×1080 (feed) · story 1080×1920
   const fmt = req.nextUrl.searchParams.get("format");
   const [width, height] =
-    fmt === "carre" ? [1080, 1080] : fmt === "story" ? [1080, 1920] : [1200, 630];
+    fmt === "carre"
+      ? [1080, 1080]
+      : fmt === "story"
+        ? [1080, 1920]
+        : fmt === "portrait"
+          ? [1080, 1350] // format optimal des carrousels Instagram
+          : [1200, 630];
+  // Carrousel : ?slide=N rend la slide N (1 = 1re slide de contenu après la
+  // couverture ; la dernière est la slide CTA composée automatiquement).
+  const slideIdx = Math.max(0, parseInt(req.nextUrl.searchParams.get("slide") || "0", 10) || 0);
 
   const post = await prisma.post.findUnique({
     where: { slug },
@@ -74,7 +83,7 @@ export async function GET(
   // Sans les polices embarquées, le rendu retombe sur la police système.
   const fonts = await loadFonts(req.nextUrl.origin).catch(() => []);
 
-  return new ImageResponse(render(visual, brand, width, height), {
+  return new ImageResponse(render(visual, brand, width, height, slideIdx), {
     width,
     height,
     ...(fonts.length ? { fonts } : {}),
@@ -425,14 +434,15 @@ function backgroundLayers(
   return layers;
 }
 
-function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
+function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slideIdx = 0) {
   const pool = accentPool(brand);
   const seed = v.seed ?? hashString(v.headline);
   const idx = ((v.accentIndex % pool.length) + pool.length) % pool.length;
   const accent = pool[idx];
   const accent2 = pool[(idx + 1) % pool.length];
   const dark = v.mode === "sombre";
-  const style: BgStyle = v.bg === "auto" ? AUTO_STYLES[seed % AUTO_STYLES.length] : v.bg;
+  const style: BgStyle =
+    v.bg === "auto" ? AUTO_STYLES[(seed + slideIdx) % AUTO_STYLES.length] : v.bg;
   const hasPhoto = Boolean(v.bgImage);
 
   const baseDark = luminance(brand.colorDark) < 0.5 ? brand.colorDark : "#0d1b2e";
@@ -559,9 +569,31 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
   const topRow = (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
       {wordmark}
-      {motifBadge}
+      {slideIdx >= 1 ? null : motifBadge}
     </div>
   );
+
+  // ---- Carrousel : slides de contenu + slide CTA finale ----
+  const slides = v.slides ?? [];
+  const inCarousel = slideIdx >= 1 && slides.length > 0 && slideIdx <= slides.length + 1;
+  const totalSlides = slides.length + 2; // couverture + contenu + CTA
+  const progressDots = inCarousel ? (
+    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      {Array.from({ length: totalSlides }).map((_, i) => (
+        <div
+          key={i}
+          style={{
+            width: i === slideIdx ? 24 : 8,
+            height: 8,
+            borderRadius: 999,
+            background: i === slideIdx ? accent : rgba(ink, 0.25),
+            display: "flex",
+          }}
+        />
+      ))}
+    </div>
+  ) : null;
+
 
   const footer = (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
@@ -569,8 +601,11 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
         <div style={{ width: 30, height: 4, borderRadius: 3, background: accent, display: "flex" }} />
         <div style={{ display: "flex", fontSize: w * 0.021, color: sub, fontWeight: 500 }}>{brand.tagline}</div>
       </div>
-      <div style={{ display: "flex", fontSize: w * 0.019, color: sub, fontWeight: 600, letterSpacing: 1 }}>
-        iOS · ANDROID
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        {progressDots}
+        <div style={{ display: "flex", fontSize: w * 0.019, color: sub, fontWeight: 600, letterSpacing: 1 }}>
+          {inCarousel && slideIdx <= slides.length ? "SUITE →" : "iOS · ANDROID"}
+        </div>
       </div>
     </div>
   );
@@ -608,7 +643,71 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
     .slice(0, 3);
 
   let body: React.ReactNode;
-  if (v.template === "astuce") {
+  if (inCarousel && slideIdx > slides.length) {
+    // Slide CTA finale (le playbook : appel à l'action en dernière slide)
+    body = (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: w * 0.022, width: "100%" }}>
+        {stars(accent, w * 0.032)}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            textAlign: "center",
+            fontSize: headlineSize,
+            ...headlineFill,
+            ...headStyle,
+            maxWidth: "90%",
+          }}
+        >
+          {cs(`Installe ${brand.name}`)}
+        </div>
+        <div style={{ display: "flex", fontSize: w * 0.026, color: sub, fontWeight: 500, textAlign: "center" }}>
+          Gratuit sur l&apos;App Store &amp; Google Play
+        </div>
+        <div
+          style={{
+            display: "flex",
+            background: `linear-gradient(135deg, ${accent}, ${mix(accent, accent2, 0.7)})`,
+            color: "#ffffff",
+            fontSize: w * 0.024,
+            fontWeight: 700,
+            padding: `${w * 0.014}px ${w * 0.04}px`,
+            borderRadius: 999,
+            marginTop: w * 0.008,
+          }}
+        >
+          Lien en bio →
+        </div>
+      </div>
+    );
+  } else if (inCarousel) {
+    // Slide de contenu : UNE idée, numérotée, lisible en 1 seconde
+    const sl = slides[slideIdx - 1];
+    body = (
+      <div style={{ display: "flex", flexDirection: "column", gap: w * 0.02, maxWidth: "92%" }}>
+        <div
+          style={{
+            display: "flex",
+            fontSize: w * 0.085,
+            fontFamily: typo.family,
+            fontWeight: 700,
+            color: accent,
+            lineHeight: 1,
+          }}
+        >
+          {String(slideIdx + 1).padStart(2, "0")}
+        </div>
+        <div style={{ display: "flex", fontSize: headlineSize * 0.72, ...headlineFill, ...headStyle }}>
+          {cs(sl.headline)}
+        </div>
+        {sl.subline ? (
+          <div style={{ display: "flex", fontSize: w * 0.028, color: sub, lineHeight: 1.35, fontWeight: 500 }}>
+            {sl.subline}
+          </div>
+        ) : null}
+      </div>
+    );
+  } else if (v.template === "astuce") {
     body = (
       <div style={{ display: "flex", flexDirection: "column", gap: w * 0.022, maxWidth: "90%" }}>
         {eyebrow("ASTUCE")}
@@ -883,6 +982,95 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number) {
             </div>
           ) : null}
         </div>
+      </div>
+    );
+  } else if (v.template === "app") {
+    // Vitrine produit : mockup téléphone montrant un match dans l'app —
+    // le visuel a un SUJET, pas seulement du texte.
+    const phoneW = Math.min(w * 0.23, (h * 0.72) / 1.95);
+    const phoneH = phoneW * 1.95;
+    const cardBg = "#ffffff";
+    const nameBar = (width: number, c: string) => (
+      <div style={{ display: "flex", width, height: phoneW * 0.045, borderRadius: 999, background: c }} />
+    );
+    const phone = (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          width: phoneW,
+          height: phoneH,
+          borderRadius: phoneW * 0.16,
+          background: mix(brand.colorDark, "#000000", 0.35),
+          border: `${Math.max(3, phoneW * 0.02)}px solid ${rgba("#ffffff", dark ? 0.25 : 0.65)}`,
+          padding: phoneW * 0.05,
+          transform: "rotate(4deg)",
+        }}
+      >
+        {/* écran */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            flex: 1,
+            borderRadius: phoneW * 0.11,
+            background: `linear-gradient(170deg, ${mix("#ffffff", accent, 0.06)} 0%, ${mix("#ffffff", accent, 0.16)} 100%)`,
+            padding: phoneW * 0.07,
+            gap: phoneW * 0.06,
+          }}
+        >
+          {/* encoche */}
+          <div style={{ display: "flex", width: phoneW * 0.3, height: phoneW * 0.035, borderRadius: 999, background: rgba("#000000", 0.25) }} />
+          {/* carte de match */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: phoneW * 0.05,
+              width: "100%",
+              background: cardBg,
+              borderRadius: phoneW * 0.09,
+              padding: `${phoneW * 0.08}px ${phoneW * 0.06}px`,
+              border: `1px solid ${rgba("#0f1720", 0.08)}`,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: phoneW * 0.06 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: phoneW * 0.24, height: phoneW * 0.24, borderRadius: 9999, background: `linear-gradient(135deg, ${accent}, ${mix(accent, "#ffffff", 0.35)})`, color: "#fff", fontSize: phoneW * 0.11, fontWeight: 700 }}>L</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: phoneW * 0.13, height: phoneW * 0.13, borderRadius: 9999, background: accent2 }}>
+                {motifSvg("coeur", "#ffffff", phoneW * 0.075)}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: phoneW * 0.24, height: phoneW * 0.24, borderRadius: 9999, background: `linear-gradient(135deg, ${accent2}, ${mix(accent2, "#ffffff", 0.35)})`, color: "#fff", fontSize: phoneW * 0.11, fontWeight: 700 }}>T</div>
+            </div>
+            <div style={{ display: "flex", background: rgba(accent, 0.13), border: `1px solid ${rgba(accent, 0.3)}`, color: accent, borderRadius: 999, padding: `${phoneW * 0.02}px ${phoneW * 0.06}px`, fontSize: phoneW * 0.085, fontWeight: 700 }}>
+              93 % compatibles
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: phoneW * 0.03, alignItems: "center" }}>
+              {nameBar(phoneW * 0.5, rgba("#0f1720", 0.15))}
+              {nameBar(phoneW * 0.34, rgba("#0f1720", 0.1))}
+            </div>
+            <div style={{ display: "flex", width: "100%", justifyContent: "center", background: `linear-gradient(135deg, ${accent}, ${mix(accent, accent2, 0.6)})`, color: "#ffffff", borderRadius: 999, padding: phoneW * 0.045, fontSize: phoneW * 0.075, fontWeight: 700 }}>
+              Matcher
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+    body = (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: w * 0.02, maxWidth: "52%" }}>
+          {eyebrow("DANS L'APP")}
+          <div style={{ display: "flex", fontSize: headlineSize * 0.8, ...headlineFill, ...headStyle }}>
+            {cs(v.headline)}
+          </div>
+          {v.subline ? (
+            <div style={{ display: "flex", fontSize: w * 0.026, color: sub, lineHeight: 1.35, fontWeight: 500 }}>
+              {v.subline}
+            </div>
+          ) : null}
+        </div>
+        {phone}
       </div>
     );
   } else {

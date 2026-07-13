@@ -391,6 +391,88 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
                 />
               </div>
             </div>
+            {/* Carrousel : le format n°1 en engagement (voir playbook) */}
+            <div className="border-t pt-3 space-y-2" style={{ borderColor: "var(--grid)" }}>
+              <p className="text-xs font-medium">
+                🎠 Carrousel{" "}
+                <span className="font-normal" style={{ color: "var(--text-muted)" }}>
+                  — le visuel ci-dessus est la couverture (hook) ; ajoute des slides (une
+                  idée chacune), la slide CTA finale est composée automatiquement.
+                </span>
+              </p>
+              {(visual.slides ?? []).map((sl, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-mono w-6 text-right" style={{ color: "var(--text-muted)" }}>
+                    {String(i + 2).padStart(2, "0")}
+                  </span>
+                  <input
+                    className="input flex-1 min-w-44"
+                    maxLength={90}
+                    placeholder="L'idée de la slide (une phrase forte)"
+                    value={sl.headline}
+                    onChange={(e) => {
+                      const slides = [...(visual.slides ?? [])];
+                      slides[i] = { ...slides[i], headline: e.target.value };
+                      setVisual({ ...visual, slides });
+                    }}
+                  />
+                  <input
+                    className="input flex-1 min-w-44"
+                    maxLength={130}
+                    placeholder="Développement court (optionnel)"
+                    value={sl.subline}
+                    onChange={(e) => {
+                      const slides = [...(visual.slides ?? [])];
+                      slides[i] = { ...slides[i], subline: e.target.value };
+                      setVisual({ ...visual, slides });
+                    }}
+                  />
+                  <a
+                    href={`/api/og/${post.slug}?slide=${i + 1}&format=portrait&v=${visualVersion}`}
+                    target="_blank"
+                    className="text-xs underline"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    voir ↗
+                  </a>
+                  <button
+                    type="button"
+                    aria-label="Retirer la slide"
+                    className="text-xs w-5 h-5 rounded-full leading-none"
+                    style={{ background: "var(--page)", color: "var(--text-muted)" }}
+                    onClick={() =>
+                      setVisual({ ...visual, slides: (visual.slides ?? []).filter((_, j) => j !== i) })
+                    }
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="btn btn-secondary !py-1 text-xs"
+                  onClick={() =>
+                    setVisual({
+                      ...visual,
+                      slides: [...(visual.slides ?? []), { headline: "", subline: "" }],
+                    })
+                  }
+                >
+                  + Ajouter une slide
+                </button>
+                {(visual.slides?.length ?? 0) > 0 && (
+                  <a
+                    href={`/api/og/${post.slug}?slide=${(visual.slides?.length ?? 0) + 1}&format=portrait&v=${visualVersion}`}
+                    target="_blank"
+                    className="text-xs underline"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    slide CTA finale ↗
+                  </a>
+                )}
+              </div>
+            </div>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               Formats fournis aux réseaux : 1200×630 (partages) ·{" "}
               <a href={`/api/og/${post.slug}?format=carre`} target="_blank" className="underline">
@@ -400,7 +482,11 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
               <a href={`/api/og/${post.slug}?format=story`} target="_blank" className="underline">
                 story 1080×1920 ↗
               </a>{" "}
-              (stories, TikTok).
+              (stories, TikTok) ·{" "}
+              <a href={`/api/og/${post.slug}?format=portrait`} target="_blank" className="underline">
+                portrait 1080×1350 ↗
+              </a>{" "}
+              (carrousels).
             </p>
           </div>
         )}

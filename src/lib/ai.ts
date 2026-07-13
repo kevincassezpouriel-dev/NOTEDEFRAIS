@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { slugify } from "./validate";
 import { buildBrandSystem, getBrand } from "./brand";
+import { PLAYBOOK } from "./playbook";
 import type { VisualSpec } from "./visual";
 
 /**
@@ -94,9 +95,10 @@ const POST_SCHEMA = {
             "temoignage",
             "match",
             "meme",
+            "app",
           ],
           description:
-            "Gabarit adapté à l'angle : annonce (grand titre + preuve sociale), astuce (pastille conseil), stat (chiffre fort en très grand), citation (verbatim), duo (titre + accroche), checklist (points clés — mets-les dans subline séparés par « · »), punch (punchline plein cadre), temoignage (avis + étoiles), match (carte de match façon UI de l'app : headline = « Prénom + Prénom », subline = « NN % · tag · tag »), meme (motif géant + texte choc centré, énergie meme)",
+            "Gabarit adapté à l'angle : annonce (grand titre + preuve sociale), astuce (pastille conseil), stat (chiffre fort en très grand), citation (verbatim), duo (titre + accroche), checklist (points clés — mets-les dans subline séparés par « · »), punch (punchline plein cadre), temoignage (avis + étoiles), match (carte de match façon UI de l'app : headline = « Prénom + Prénom », subline = « NN % · tag · tag »), meme (motif géant + texte choc centré, énergie meme), app (vitrine produit : mockup téléphone montrant un match dans l'app — headline courte à gauche)",
         },
         headline: {
           type: "string" as const,
@@ -144,8 +146,28 @@ const POST_SCHEMA = {
           enum: ["sombre", "clair"],
           description: "Fond sombre (impactant) ou clair (léger) selon le ton du post",
         },
+        slides: {
+          type: "array" as const,
+          description:
+            "CARROUSEL (format n°1 en engagement — produis-en un dès que le sujet s'y prête : astuces, étapes, liste, erreurs à éviter). 3 à 6 slides APRÈS la couverture : la couverture (headline ci-dessus) est le HOOK, chaque slide porte UNE idée, la slide CTA finale est ajoutée automatiquement. Tableau vide [] pour un post à visuel unique (meme, match, stat…).",
+          items: {
+            type: "object" as const,
+            properties: {
+              headline: {
+                type: "string" as const,
+                description: "L'idée de la slide, une phrase forte (max 70 caractères)",
+              },
+              subline: {
+                type: "string" as const,
+                description: "Développement court (max 110 caractères, ou vide)",
+              },
+            },
+            required: ["headline", "subline"],
+            additionalProperties: false,
+          },
+        },
       },
-      required: ["template", "headline", "subline", "accentIndex", "bg", "motif", "mode"],
+      required: ["template", "headline", "subline", "accentIndex", "bg", "motif", "mode", "slides"],
       additionalProperties: false,
     },
   },
@@ -222,7 +244,8 @@ export async function generateMarketingPost(opts: {
     // Prompt de marque stable → mis en cache : les tokens du cadrage ne sont
     // facturés qu'à ~10 % lors des générations suivantes.
     system: [
-      { type: "text", text: buildBrandSystem(brand), cache_control: { type: "ephemeral" } },
+      { type: "text", text: buildBrandSystem(brand) },
+      { type: "text", text: PLAYBOOK, cache_control: { type: "ephemeral" } },
     ],
     ...reqOpts(MODEL_WRITE, "medium", POST_SCHEMA),
     messages: [{ role: "user", content: parts.join("\n\n") }],
