@@ -1,25 +1,32 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getBrand } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Actualités — MINGGLE",
-  description: "Les dernières actualités de MINGGLE.",
-};
+export async function generateMetadata() {
+  const brand = await getBrand();
+  return {
+    title: `Actualités — ${brand.name}`,
+    description: `Les dernières actualités de ${brand.name}.`,
+  };
+}
 
 export default async function NewsPage() {
-  const posts = await prisma.post.findMany({
-    where: { status: "published" },
-    orderBy: { publishedAt: "desc" },
-    select: { slug: true, title: true, excerpt: true, publishedAt: true },
-  });
+  const [posts, brand] = await Promise.all([
+    prisma.post.findMany({
+      where: { status: "published" },
+      orderBy: { publishedAt: "desc" },
+      select: { slug: true, title: true, excerpt: true, publishedAt: true },
+    }),
+    getBrand(),
+  ]);
 
   return (
     <main className="min-h-screen p-6 sm:p-10">
       <div className="max-w-2xl mx-auto">
         <header className="mb-10 text-center">
-          <h1 className="text-3xl font-semibold mb-2">Actualités MINGGLE</h1>
+          <h1 className="text-3xl font-semibold mb-2">Actualités {brand.name}</h1>
           <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Nouveautés, astuces et coulisses de l&apos;application.
           </p>
@@ -30,26 +37,37 @@ export default async function NewsPage() {
             Aucun article publié pour le moment — revenez bientôt !
           </p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {posts.map((post) => (
               <Link
                 key={post.slug}
                 href={`/news/${post.slug}`}
-                className="card block p-6 hover:opacity-90 transition-opacity"
+                className="card block overflow-hidden hover:opacity-90 transition-opacity"
               >
-                <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
-                  {post.publishedAt?.toLocaleDateString("fr-FR", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </p>
-                <h2 className="text-lg font-semibold mb-1">{post.title}</h2>
-                {post.excerpt && (
-                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                    {post.excerpt}
+                {/* Visuel de marque du post : chaque article a le sien */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/og/${post.slug}`}
+                  alt=""
+                  loading="lazy"
+                  className="w-full block"
+                  style={{ aspectRatio: "1200 / 630", objectFit: "cover" }}
+                />
+                <div className="p-6">
+                  <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
+                    {post.publishedAt?.toLocaleDateString("fr-FR", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
                   </p>
-                )}
+                  <h2 className="text-lg font-semibold mb-1">{post.title}</h2>
+                  {post.excerpt && (
+                    <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                      {post.excerpt}
+                    </p>
+                  )}
+                </div>
               </Link>
             ))}
           </div>
