@@ -604,3 +604,151 @@ ni les éléments propres à l'autre marque. L'accroche produite porte NOTRE mes
   const blocks = response.content.filter((b) => b.type === "text");
   return JSON.parse(blocks[blocks.length - 1]?.text ?? "") as InspireResult;
 }
+
+const DNA_SCHEMA = {
+  type: "object" as const,
+  properties: {
+    name: { type: "string" as const, description: "Nom de la marque" },
+    tagline: { type: "string" as const, description: "Signature courte de la marque" },
+    description: { type: "string" as const, description: "Ce qu'est le produit, pour qui (2-3 phrases)" },
+    tone: { type: "string" as const, description: "Le ton rédactionnel constaté sur le site (tutoiement ? énergie ? registre ?)" },
+    audience: { type: "string" as const, description: "L'audience visée, déduite du site" },
+    pillars: { type: "string" as const, description: "4 à 6 thèmes de contenu, un par ligne (\\n)" },
+    avoid: { type: "string" as const, description: "4 à 6 interdits éditoriaux cohérents avec la marque, un par ligne" },
+    vocabulary: { type: "string" as const, description: "6 à 10 mots/expressions propres à la marque relevés sur le site, un par ligne" },
+    ctaExamples: { type: "string" as const, description: "3 à 5 appels à l'action dans la voix du site, un par ligne" },
+    emojiPolicy: { type: "string" as const, description: "Règle d'usage des emojis cohérente avec le ton" },
+    colorPrimary: { type: "string" as const, description: "Couleur principale du site en hex #RRGGBB" },
+    colorSecondary: { type: "string" as const, description: "Couleur secondaire en hex #RRGGBB" },
+    colorDark: { type: "string" as const, description: "Couleur sombre/encre du site en hex #RRGGBB" },
+    palette: {
+      type: "array" as const,
+      items: { type: "string" as const },
+      description: "2 à 4 couleurs d'accent supplémentaires vues sur le site (hex #RRGGBB)",
+    },
+    rationale: { type: "string" as const, description: "Ce que tu as observé pour aboutir à ce profil (2-3 phrases)" },
+  },
+  required: [
+    "name", "tagline", "description", "tone", "audience", "pillars", "avoid",
+    "vocabulary", "ctaExamples", "emojiPolicy", "colorPrimary", "colorSecondary",
+    "colorDark", "palette", "rationale",
+  ],
+  additionalProperties: false,
+};
+
+export interface BrandDna {
+  name: string; tagline: string; description: string; tone: string; audience: string;
+  pillars: string; avoid: string; vocabulary: string; ctaExamples: string; emojiPolicy: string;
+  colorPrimary: string; colorSecondary: string; colorDark: string; palette: string[];
+  rationale: string;
+}
+
+/**
+ * ADN DE MARQUE (méthode Pomelli / Google Labs) : on donne l'URL du site →
+ * l'IA le lit (web_fetch) et le recoupe (web_search), puis en extrait le
+ * profil complet — ton, audience, piliers, vocabulaire, palette de couleurs.
+ * Le résultat PRÉ-REMPLIT la page Marque & IA : tu relis, ajustes, enregistres.
+ */
+export async function extractBrandDna(url: string): Promise<BrandDna> {
+  const response = await client().messages.create({
+    model: MODEL_WRITE,
+    max_tokens: 8000,
+    ...reqOpts(MODEL_WRITE, "high", DNA_SCHEMA),
+    tools: [
+      { type: "web_fetch_20250910", name: "web_fetch", max_uses: 6 },
+      { type: "web_search_20250305", name: "web_search", max_uses: 4 },
+    ],
+    messages: [
+      {
+        role: "user",
+        content: `Analyse ce site et établis l'ADN complet de la marque : ${url}
+
+Méthode :
+1. Lis la page d'accueil (web_fetch) et 1-2 pages clés si utile.
+2. Complète par une recherche web si le site est peu bavard.
+3. Extrais : le TON réel (tutoiement/vouvoiement, énergie, registre), l'audience,
+   les thèmes récurrents (piliers), le vocabulaire distinctif, les appels à
+   l'action utilisés, et la PALETTE de couleurs dominante du site (hex).
+Reste fidèle à ce que tu OBSERVES — n'invente pas un positionnement.`,
+      },
+    ],
+  } as Anthropic.Messages.MessageCreateParamsNonStreaming);
+
+  if (response.stop_reason === "refusal") {
+    throw new Error("L'analyse du site a été refusée par le modèle.");
+  }
+  const blocks = response.content.filter((b) => b.type === "text");
+  return JSON.parse(blocks[blocks.length - 1]?.text ?? "") as BrandDna;
+}
+
+const CAMPAIGN_IDEAS_SCHEMA = {
+  type: "object" as const,
+  properties: {
+    ideas: {
+      type: "array" as const,
+      description: "3 à 4 idées de campagnes marketing distinctes et actionnables",
+      items: {
+        type: "object" as const,
+        properties: {
+          name: { type: "string" as const, description: "Nom court de la campagne (max 50 caractères)" },
+          objective: { type: "string" as const, description: "Objectif mesurable en une phrase" },
+          angle: { type: "string" as const, description: "L'angle créatif en 1-2 phrases" },
+          firstPostBrief: {
+            type: "string" as const,
+            description: "Brief du premier post de la campagne, prêt pour le générateur (2-3 phrases)",
+          },
+        },
+        required: ["name", "objective", "angle", "firstPostBrief"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["ideas"],
+  additionalProperties: false,
+};
+
+export interface CampaignIdea {
+  name: string;
+  objective: string;
+  angle: string;
+  firstPostBrief: string;
+}
+
+/**
+ * IDÉES DE CAMPAGNES (méthode Pomelli, étape 2) : à partir de l'ADN de
+ * marque, du playbook et des performances réelles, propose des campagnes
+ * prêtes à créer — chacune avec son premier post à générer en un clic.
+ */
+export async function generateCampaignIdeas(context: {
+  statsSummary?: string;
+  learnings?: string[];
+  existingCampaigns?: string[];
+}): Promise<CampaignIdea[]> {
+  const brand = await getBrand();
+  const parts = [
+    "Propose des idées de campagnes marketing pour la marque (voir cadrage système).",
+  ];
+  if (context.existingCampaigns?.length) {
+    parts.push(`Campagnes déjà existantes (n'en propose pas de redondantes) :\n- ${context.existingCampaigns.join("\n- ")}`);
+  }
+  if (context.learnings?.length) {
+    parts.push(`Apprentissages tirés de nos performances (appuie-toi dessus) :\n- ${context.learnings.join("\n- ")}`);
+  }
+  if (context.statsSummary) parts.push(`Données d'audience récentes :\n${context.statsSummary}`);
+
+  const response = await client().messages.create({
+    model: MODEL_WRITE,
+    max_tokens: 6000,
+    system: [
+      { type: "text", text: buildBrandSystem(brand) },
+      { type: "text", text: PLAYBOOK, cache_control: { type: "ephemeral" } },
+    ],
+    ...reqOpts(MODEL_WRITE, "medium", CAMPAIGN_IDEAS_SCHEMA),
+    messages: [{ role: "user", content: parts.join("\n\n") }],
+  } as Anthropic.Messages.MessageCreateParamsNonStreaming);
+
+  if (response.stop_reason === "refusal") return [];
+  const blocks = response.content.filter((b) => b.type === "text");
+  const parsed = JSON.parse(blocks[blocks.length - 1]?.text ?? "{}") as { ideas?: CampaignIdea[] };
+  return parsed.ideas ?? [];
+}

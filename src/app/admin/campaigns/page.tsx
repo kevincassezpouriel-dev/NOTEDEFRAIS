@@ -25,6 +25,51 @@ export default function CampaignsPage() {
   const [objective, setObjective] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ideas, setIdeas] = useState<
+    { name: string; objective: string; angle: string; firstPostBrief: string }[] | null
+  >(null);
+  const [ideasBusy, setIdeasBusy] = useState(false);
+  const [adopting, setAdopting] = useState<number | null>(null);
+
+  async function fetchIdeas() {
+    setIdeasBusy(true);
+    setError(null);
+    const res = await fetch("/api/admin/ai/campaign-ideas", { method: "POST" });
+    setIdeasBusy(false);
+    if (res.ok) {
+      const data = await res.json();
+      setIdeas(data.ideas ?? []);
+    } else {
+      const data = await res.json().catch(() => null);
+      setError(data?.error ?? "Erreur");
+    }
+  }
+
+  /** Adopte une idée : crée la campagne PUIS génère son premier post. */
+  async function adopt(idea: NonNullable<typeof ideas>[number], i: number) {
+    setAdopting(i);
+    setError(null);
+    const res = await fetch("/api/admin/campaigns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: idea.name, objective: idea.objective }),
+    });
+    if (!res.ok) {
+      setAdopting(null);
+      setError("Création de la campagne impossible");
+      return;
+    }
+    const campaign = await res.json();
+    // Premier post de la campagne, généré depuis le brief de l'idée
+    await fetch("/api/admin/ai/post", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ campaignId: campaign.id, brief: idea.firstPostBrief }),
+    }).catch(() => null);
+    setAdopting(null);
+    setIdeas((prev) => prev?.filter((_, j) => j !== i) ?? null);
+    load();
+  }
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/campaigns", { cache: "no-store" });
@@ -63,6 +108,42 @@ export default function CampaignsPage() {
           Une campagne regroupe un objectif, ses QR codes et liens, ses posts et
           tout ce que l&apos;IA en apprend. C&apos;est votre unité de pilotage.
         </p>
+      </div>
+
+      {/* Idées de campagnes (méthode Pomelli, étape 2) */}
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h2 className="text-sm font-semibold">💡 Idées de campagnes</h2>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              L&apos;IA propose des campagnes à partir de ton ADN de marque, du playbook
+              et de tes performances — chacune créée avec son premier post en un clic.
+            </p>
+          </div>
+          <button type="button" className="btn btn-secondary" onClick={fetchIdeas} disabled={ideasBusy}>
+            {ideasBusy ? "Réflexion… (~30 s)" : "💡 Proposer des campagnes"}
+          </button>
+        </div>
+        {ideas !== null && ideas.length === 0 && (
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>Aucune idée générée — réessaie.</p>
+        )}
+        {ideas?.map((idea, i) => (
+          <div key={i} className="flex flex-wrap items-center gap-3 border-t pt-3" style={{ borderColor: "var(--grid)" }}>
+            <div className="flex-1 min-w-56">
+              <p className="text-sm font-semibold">{idea.name}</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>{idea.objective}</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{idea.angle}</p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={adopting !== null}
+              onClick={() => adopt(idea, i)}
+            >
+              {adopting === i ? "Création + 1er post…" : "🚀 Lancer cette campagne"}
+            </button>
+          </div>
+        ))}
       </div>
 
       <form onSubmit={create} className="card p-4 flex flex-wrap items-end gap-3">

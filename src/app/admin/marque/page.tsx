@@ -83,6 +83,50 @@ export default function MarquePage() {
   const [brand, setBrand] = useState<Brand | null>(null);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [dnaUrl, setDnaUrl] = useState("");
+  const [dnaBusy, setDnaBusy] = useState(false);
+
+  async function extractDna(e: React.FormEvent) {
+    e.preventDefault();
+    if (!brand) return;
+    setDnaBusy(true);
+    setMessage(null);
+    const res = await fetch("/api/admin/ai/dna", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: dnaUrl }),
+    });
+    setDnaBusy(false);
+    if (res.ok) {
+      const dna = (await res.json()) as Partial<Brand> & { rationale?: string; palette?: string[] };
+      setBrand({
+        ...brand,
+        ...(dna.name ? { name: dna.name } : {}),
+        ...(dna.tagline ? { tagline: dna.tagline } : {}),
+        ...(dna.description ? { description: dna.description } : {}),
+        ...(dna.tone ? { tone: dna.tone } : {}),
+        ...(dna.audience ? { audience: dna.audience } : {}),
+        ...(dna.pillars ? { pillars: dna.pillars } : {}),
+        ...(dna.avoid ? { avoid: dna.avoid } : {}),
+        ...(dna.vocabulary ? { vocabulary: dna.vocabulary } : {}),
+        ...(dna.ctaExamples ? { ctaExamples: dna.ctaExamples } : {}),
+        ...(dna.emojiPolicy ? { emojiPolicy: dna.emojiPolicy } : {}),
+        ...(/^#[0-9a-fA-F]{6}$/.test(dna.colorPrimary ?? "") ? { colorPrimary: dna.colorPrimary! } : {}),
+        ...(/^#[0-9a-fA-F]{6}$/.test(dna.colorSecondary ?? "") ? { colorSecondary: dna.colorSecondary! } : {}),
+        ...(/^#[0-9a-fA-F]{6}$/.test(dna.colorDark ?? "") ? { colorDark: dna.colorDark! } : {}),
+        ...(Array.isArray(dna.palette)
+          ? { palette: dna.palette.filter((c) => /^#[0-9a-fA-F]{6}$/.test(c)).map((c) => c.toLowerCase()) }
+          : {}),
+      });
+      setMessage({
+        text: `🧬 ADN extrait — ${dna.rationale ?? ""} Relis les champs ci-dessous puis Enregistre.`,
+        error: false,
+      });
+    } else {
+      const data = await res.json().catch(() => null);
+      setMessage({ text: data?.error ?? "Échec de l'analyse du site", error: true });
+    }
+  }
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/brand", { cache: "no-store" });
@@ -138,6 +182,35 @@ export default function MarquePage() {
           respectant ces interdits ; les visuels utilisent uniquement ce logo,
           cette typo et cette palette. Rien ne peut diverger de ce qui est défini ici.
         </p>
+      </div>
+
+      {/* ADN de marque (méthode Pomelli) : le site remplit la charte */}
+      <div className="card p-5">
+        <h2 className="text-sm font-semibold mb-1">🧬 ADN de marque automatique</h2>
+        <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+          Donne l&apos;URL de ton site : l&apos;IA le lit et en extrait ton profil complet —
+          ton, audience, piliers, vocabulaire, appels à l&apos;action et palette de
+          couleurs — puis pré-remplit tout le cadrage ci-dessous. Tu relis, tu
+          ajustes, tu enregistres.
+        </p>
+        <form onSubmit={extractDna} className="flex flex-wrap gap-2">
+          <input
+            className="input flex-1 min-w-64"
+            type="url"
+            placeholder="https://www.minggle.fr"
+            value={dnaUrl}
+            onChange={(e) => setDnaUrl(e.target.value)}
+            required
+          />
+          <button type="submit" className="btn btn-primary" disabled={dnaBusy}>
+            {dnaBusy ? "Lecture du site… (~1 min)" : "🧬 Analyser mon site"}
+          </button>
+        </form>
+        {message && (
+          <p className="text-sm mt-3" style={{ color: message.error ? "var(--critical)" : "var(--good)" }}>
+            {message.text}
+          </p>
+        )}
       </div>
 
       <form onSubmit={save} className="card p-5 space-y-5">
