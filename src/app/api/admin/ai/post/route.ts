@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     campaignId?: string;
     useStats?: boolean;
     research?: boolean;
+    channels?: string[];
   };
 
   const [qr, campaign] = await Promise.all([
@@ -78,7 +79,9 @@ export async function POST(req: NextRequest) {
       performanceBrief: perfBrief,
       recentVisuals: recentSpecs.map(describeVisual),
       research: body.research === true,
+      channels: Array.isArray(body.channels) ? body.channels.slice(0, 6) : undefined,
     });
+    if (body.channels?.length) generated.visual.channels = body.channels.slice(0, 6);
     generated.visual = diversifyVisual(generated.visual, recentSpecs);
 
     const post = await createPost({

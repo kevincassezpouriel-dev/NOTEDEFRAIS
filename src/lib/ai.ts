@@ -214,6 +214,8 @@ export async function generateMarketingPost(opts: {
   learnings?: string[];
   performanceBrief?: string;
   recentVisuals?: string[];
+  /** Réseaux imposés par l'utilisateur : l'IA y adapte ton, format et visuel. */
+  channels?: string[];
   /** Recherche web AVANT d'écrire : posts factuels (lieux réels, adresses,
    *  chiffres sourcés). Coût : ~10 $ / 1000 recherches + tokens. */
   research?: boolean;
@@ -266,6 +268,11 @@ export async function generateMarketingPost(opts: {
       `Images de la bibliothèque de marque disponibles pour le fond du visuel (champ bgAsset) :\n${brand.assets
         .map((a, i) => `${i} = ${a.name}`)
         .join("\n")}\n(-1 si aucune ne convient)`
+    );
+  }
+  if (opts.channels?.length) {
+    parts.push(
+      `RÉSEAUX CIBLES IMPOSÉS : ${opts.channels.join(", ")}. Adapte le ton, le format et le gabarit à ces réseaux (LinkedIn → angle pro et chiffré ; TikTok/Story → punchline percutante ; feed Instagram → carrousel privilégié) et renseigne EXACTEMENT ces réseaux dans visual.channels.`
     );
   }
   if (opts.research) {

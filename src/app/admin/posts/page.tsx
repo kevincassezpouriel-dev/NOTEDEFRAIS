@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { CHANNELS } from "@/lib/visual";
 
 interface PostRow {
   id: string;
@@ -28,6 +29,7 @@ export default function PostsPage() {
   const [brief, setBrief] = useState("");
   const [qrCodeId, setQrCodeId] = useState("");
   const [research, setResearch] = useState(false);
+  const [channels, setChannels] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +56,7 @@ export default function PostsPage() {
         brief: brief || undefined,
         qrCodeId: qrCodeId || undefined,
         research,
+        channels: channels.length ? channels : undefined,
       }),
     });
     setGenerating(false);
@@ -121,6 +124,30 @@ export default function PostsPage() {
           <button onClick={generate} className="btn btn-primary" disabled={generating}>
             {generating ? (research ? "Recherche + rédaction… (~1 min)" : "Génération… (~30 s)") : "✨ Générer un brouillon"}
           </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-medium mr-1">Réseaux :</span>
+          {CHANNELS.map((ch) => {
+            const on = channels.includes(ch.value);
+            return (
+              <button key={ch.value} type="button"
+                className="text-xs px-2.5 py-1 rounded-full"
+                style={{
+                  border: `1px solid ${on ? "var(--accent)" : "var(--baseline)"}`,
+                  background: on ? "var(--accent-soft)" : "transparent",
+                  color: on ? "var(--accent)" : "var(--text-muted)",
+                  fontWeight: on ? 650 : 450,
+                }}
+                onClick={() =>
+                  setChannels(on ? channels.filter((c) => c !== ch.value) : [...channels, ch.value])
+                }>
+                {ch.label}
+              </button>
+            );
+          })}
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            (vide = l'IA choisit)
+          </span>
         </div>
         <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: "var(--text-secondary)" }}>
           <input type="checkbox" checked={research} onChange={(e) => setResearch(e.target.checked)} />
