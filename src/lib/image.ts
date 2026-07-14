@@ -22,7 +22,7 @@ import { getBrand } from "./brand";
  */
 
 export function imageGenEnabled(): boolean {
-  return Boolean(process.env.IMAGE_API_KEY || process.env.OPENAI_API_KEY);
+  return Boolean(process.env.IMAGE_API_KEY || process.env.OPENAI_API_KEY || process.env.OPENAI_API_KE);
 }
 
 /**
@@ -58,7 +58,7 @@ interface OpenAIImageResponse {
  * @throws en cas d'erreur API explicite (pour remonter un message clair à l'UI).
  */
 export async function generateImage(prompt: string): Promise<string | null> {
-  const key = process.env.IMAGE_API_KEY || process.env.OPENAI_API_KEY;
+  const key = process.env.IMAGE_API_KEY || process.env.OPENAI_API_KEY || process.env.OPENAI_API_KE;
   if (!key) return null;
 
   const url = process.env.IMAGE_API_URL || "https://api.openai.com/v1/images/generations";

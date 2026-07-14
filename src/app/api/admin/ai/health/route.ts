@@ -14,7 +14,7 @@ export async function GET() {
     keyLength: key.length,
     keyTail: key ? `…${key.slice(-4)}` : null,
     keyLooksValid: key.startsWith("sk-ant-"),
-    imageConfigured: Boolean(process.env.IMAGE_API_KEY || process.env.OPENAI_API_KEY),
+    imageConfigured: Boolean(process.env.IMAGE_API_KEY || process.env.OPENAI_API_KEY || process.env.OPENAI_API_KE),
     // Contexte de déploiement (renseigné automatiquement par Vercel) :
     // permet de confirmer QUEL déploiement/commit sert réellement le site.
     deployment: {
