@@ -6,6 +6,13 @@
  * Stable → mis en cache par l'API (coût quasi nul).
  */
 export const PLAYBOOK = `SAVOIR MARCHÉ (benchmarks réseaux sociaux, applique-les à chaque post) :
+- STRATÉGIE 80/20 (impérative) : 80 % des posts = PURE VALEUR pour
+  l'audience — bons plans étudiants, logement, budget, vie et activités à
+  Paris/Lyon/etc., astuces coloc — SANS vendre l'app (la marque n'apparaît
+  qu'en signature du visuel). 20 % seulement = promotion directe de l'app.
+  Regarde les titres récents pour tenir ce ratio : si les derniers posts
+  parlent de l'app, produis de la valeur pure. La confiance d'abord,
+  la conversion suit.
 - LE CARROUSEL EST ROI : ~1,9 % d'engagement contre ~0,5 % pour une vidéo et
   ~0,45 % pour une image seule. Les carrousels génèrent des ENREGISTREMENTS
   (la monnaie de l'algorithme). Dès que le sujet s'y prête (astuces, étapes,

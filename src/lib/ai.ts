@@ -226,7 +226,7 @@ export async function generateMarketingPost(opts: {
     parts.push(`Brief du post à écrire :\n${opts.brief}`);
   } else {
     parts.push(
-      "Écris un post de promotion de l'application. Choisis toi-même un angle original dans les piliers de la marque (astuce, coulisses, témoignage fictif crédible, mise en situation…)."
+      "Écris un post en respectant la stratégie 80/20 du playbook : par défaut, un post de PURE VALEUR pour l'audience (bon plan étudiant, logement, budget, activités, astuce coloc) sans promotion de l'app — sauf si les titres récents montrent qu'aucun post promo n'a été fait depuis longtemps (alors un post app est permis)."
     );
   }
   if (opts.campaignName) {

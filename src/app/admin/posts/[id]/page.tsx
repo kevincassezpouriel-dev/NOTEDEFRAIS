@@ -473,6 +473,31 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
                   idée chacune), la slide CTA finale est composée automatiquement.
                 </span>
               </p>
+              {(visual.slides?.length ?? 0) > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/api/og/${post.slug}?format=portrait&v=${visualVersion}`} alt="couverture"
+                    className="rounded-lg border shrink-0" style={{ width: 150, borderColor: "var(--border)" }} />
+                  {(visual.slides ?? []).map((_, i) => (
+                    <div key={i} className="relative shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={`/api/og/${post.slug}?slide=${i + 1}&format=portrait&v=${visualVersion}`} alt={`slide ${i + 2}`}
+                        className="rounded-lg border" style={{ width: 150, borderColor: "var(--border)" }} />
+                      <button type="button" aria-label="Supprimer la slide"
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full text-xs leading-none"
+                        style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}
+                        onClick={() =>
+                          setVisual({ ...visual, slides: (visual.slides ?? []).filter((_, j) => j !== i) })
+                        }>
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/api/og/${post.slug}?slide=${(visual.slides?.length ?? 0) + 1}&format=portrait&v=${visualVersion}`} alt="slide CTA"
+                    className="rounded-lg border shrink-0" style={{ width: 150, borderColor: "var(--border)" }} />
+                </div>
+              )}
               {(visual.slides ?? []).map((sl, i) => (
                 <div key={i} className="flex flex-wrap items-center gap-2">
                   <span className="text-xs font-mono w-6 text-right" style={{ color: "var(--text-muted)" }}>
