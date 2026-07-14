@@ -88,6 +88,11 @@ export async function GET(
 
   const brand = await getBrand();
   const visual = parseVisual(post.visual, post.title, slug);
+  // Slide de carrousel : sa photo dédiée passe en fond (voile + texte par-dessus)
+  if (slideIdx >= 1 && visual.slides?.[slideIdx - 1]?.bgImage) {
+    visual.bgImage = visual.slides[slideIdx - 1].bgImage ?? null;
+    if (visual.template === "ia") visual.template = "punch";
+  }
   // Image de la bibliothèque de marque posée en fond (si pas d'image dédiée)
   if (!visual.bgImage && visual.bgAsset !== undefined) {
     visual.bgImage = brand.assets?.[visual.bgAsset]?.data ?? null;

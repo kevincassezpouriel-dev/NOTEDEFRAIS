@@ -180,10 +180,16 @@ const POST_SCHEMA = {
               },
               subline: {
                 type: "string" as const,
-                description: "Développement court (max 110 caractères, ou vide)",
+                description:
+                  "Développement court (max 110 caractères). Pour un LIEU RÉEL (bar, resto, activité) : ADRESSE EXACTE obligatoire puis pourquoi, ex. « 12 rue Belfort, Croix-Rousse · terrasse au calme »",
+              },
+              photoIdea: {
+                type: "string" as const,
+                description:
+                  "Description EN ANGLAIS de la photo d'illustration de cette slide (ambiance du lieu, scène réaliste, aucun texte). Obligatoire pour les lieux réels ; chaîne vide sinon.",
               },
             },
-            required: ["headline", "subline"],
+            required: ["headline", "subline", "photoIdea"],
             additionalProperties: false,
           },
         },

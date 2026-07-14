@@ -98,9 +98,19 @@ export async function POST(req: NextRequest) {
     // Photo IA automatique (si l'IA l'a demandée et qu'IMAGE_API_KEY est là) —
     // après la création : un échec photo ne coûte jamais le post.
     const photoIdea = (generated.visual as { photoIdea?: string }).photoIdea;
+    // Photos des slides du carrousel (lieux réels illustrés) — cap à 4
+    const slides = (generated.visual.slides ?? []) as ({ headline: string; subline: string; bgImage?: string | null } & { photoIdea?: string })[];
+    let made = 0;
+    for (const sl of slides) {
+      if (made >= 4) break;
+      const img = await tryAutoPhoto(sl.headline, sl.photoIdea);
+      if (img) { sl.bgImage = img; made++; }
+    }
     const bg = await tryAutoPhoto(generated.visual.headline, photoIdea);
-    if (bg) {
-      const withPhoto = { ...generated.visual, bgImage: bg, template: "ia" as const };
+    if (bg || made > 0) {
+      const withPhoto = bg
+        ? { ...generated.visual, bgImage: bg, template: "ia" as const }
+        : { ...generated.visual };
       const updated = await prisma.post.update({
         where: { id: post.id },
         data: { visual: JSON.stringify(withPhoto) },
