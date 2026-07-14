@@ -25,5 +25,5 @@ export const PLAYBOOK = `SAVOIR MARCHÉ (benchmarks réseaux sociaux, applique-l
 - CE QUI CRÉE LA CONFIANCE : témoignages nommés et chiffres précis
   (« 93 % » bat « la plupart »).
 - HASHTAGS : 3 à 5, niche et localisés (#colocLyon bat #immobilier).
-- TEXTE SUR IMAGE : courts, gros, contrastés — lisibles sur un téléphone
+- SURLIGNAGE : les visuels qui performent surlignent 1-2 mots clés au\n  marqueur et jouent le contraste typographique (capitales ↔ italique).\n- TEXTE SUR IMAGE : courts, gros, contrastés — lisibles sur un téléphone
   en 1 seconde, dans un feed qui défile.`;

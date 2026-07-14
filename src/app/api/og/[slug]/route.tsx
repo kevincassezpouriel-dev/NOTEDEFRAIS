@@ -26,6 +26,7 @@ function loadFonts(origin: string) {
           { file: "SpaceGrotesk-Medium.ttf", name: "Space Grotesk", weight: 500 },
           { file: "SpaceGrotesk-Light.ttf", name: "Space Grotesk", weight: 300 },
           { file: "ArchivoBlack.ttf", name: "Archivo Black", weight: 400 },
+          { file: "InstrumentSerif-Italic.ttf", name: "Instrument Serif", weight: 400 },
         ] as const
       ).map(async (f) => ({
         name: f.name,
@@ -248,6 +249,64 @@ function motifSvg(motif: Motif, color: string, size: number, strokeW = 2) {
 }
 
 // Chaque personnalité typographique = une vraie police + graisse + casse.
+/* ---------- texte riche (le langage des studios de design) ----------
+ * [mots] → surlignés au marqueur · *mots* → serif italique · _mots_ → soulignés
+ * L'IA écrit ce marquage elle-même dans ses accroches. */
+type RichOpts = {
+  size: number; color: string; accent: string; onAccent: string;
+  weight: number; family: string; spacing: number; lineHeight: number;
+  uppercase: boolean; center?: boolean;
+};
+function stripRich(t: string): string {
+  return t.replace(/[\[\]*_|]/g, " ").replace(/\s+/g, " ").trim();
+}
+function richText(text: string, o: RichOpts) {
+  const tokens: { w: string; kind: string }[] = [];
+  const re = /\[([^\]]+)\]|\*([^*]+)\*|_([^_]+)_|([^\[\]*_]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const kind = m[1] ? "hl" : m[2] ? "serif" : m[3] ? "ul" : "plain";
+    for (const w of (m[1] ?? m[2] ?? m[3] ?? m[4] ?? "").trim().split(/\s+/).filter(Boolean))
+      tokens.push({ w, kind });
+  }
+  const base = {
+    display: "flex" as const, fontSize: o.size, fontFamily: o.family,
+    fontWeight: o.weight, letterSpacing: o.spacing, lineHeight: o.lineHeight, color: o.color,
+  };
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline",
+      justifyContent: o.center ? "center" : "flex-start",
+      columnGap: o.size * 0.24, rowGap: o.size * 0.16, maxWidth: "100%" }}>
+      {tokens.map((t, i) => {
+        const txt = o.uppercase && t.kind !== "serif" ? t.w.toUpperCase() : t.w;
+        if (t.kind === "hl")
+          return (
+            <span key={i} style={{ ...base, background: o.accent, color: o.onAccent,
+              padding: `${o.size * 0.01}px ${o.size * 0.16}px ${o.size * 0.09}px`,
+              borderRadius: o.size * 0.09, transform: `rotate(${i % 2 ? -1.2 : 1}deg)` }}>
+              {txt}
+            </span>
+          );
+        if (t.kind === "serif")
+          return (
+            <span key={i} style={{ ...base, fontFamily: "Instrument Serif",
+              fontWeight: 400, fontSize: o.size * 1.1 }}>
+              {t.w}
+            </span>
+          );
+        if (t.kind === "ul")
+          return (
+            <span key={i} style={{ ...base, borderBottom: `${Math.max(3, o.size * 0.07)}px solid ${o.accent}`,
+              paddingBottom: o.size * 0.04 }}>
+              {txt}
+            </span>
+          );
+        return <span key={i} style={base}>{txt}</span>;
+      })}
+    </div>
+  );
+}
+
 const TYPO: Record<
   BrandIdentity["typography"],
   { family: string; weight: number; spacing: number; uppercase: boolean; lineHeight: number }
@@ -527,6 +586,14 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slide
       />
     ) : null;
 
+  const onAccent = luminance(accent) > 0.62 ? "#171a2b" : "#ffffff";
+  const rich = (text: string, size: number, center = false, family?: string) =>
+    richText(text, {
+      size, color: ink, accent, onAccent, weight: typo.weight,
+      family: family ?? typo.family, spacing: typo.spacing,
+      lineHeight: typo.lineHeight, uppercase: typo.uppercase, center,
+    });
+
   // Barre d'accent verticale à gauche (structure), sauf en mode photo.
   const bar = !hasPhoto ? (
     <div
@@ -663,9 +730,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slide
     </div>
   );
 
-  const headline = (size = headlineSize) => (
-    <div style={{ display: "flex", fontSize: size, ...headlineFill, ...headStyle }}>{cs(v.headline)}</div>
-  );
+  const headline = (size = headlineSize) => rich(v.headline, size);
 
   // Découpe la subline en points pour la checklist.
   const items = v.subline
@@ -729,9 +794,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slide
         >
           {String(slideIdx + 1).padStart(2, "0")}
         </div>
-        <div style={{ display: "flex", fontSize: headlineSize * 0.72, ...headlineFill, ...headStyle }}>
-          {cs(sl.headline)}
-        </div>
+        {rich(sl.headline, headlineSize * 0.72)}
         {sl.subline ? (
           <div style={{ display: "flex", fontSize: w * 0.028, color: sub, lineHeight: 1.35, fontWeight: 500 }}>
             {sl.subline}
@@ -764,7 +827,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slide
             letterSpacing: -4,
           }}
         >
-          {v.headline}
+          {stripRich(v.headline)}
         </div>
         {v.subline ? (
           <div style={{ display: "flex", fontSize: w * 0.036, fontWeight: 700, color: ink, lineHeight: 1.15, maxWidth: "80%" }}>
@@ -777,9 +840,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slide
     body = (
       <div style={{ display: "flex", flexDirection: "column", gap: w * 0.01, maxWidth: "88%" }}>
         <div style={{ display: "flex", fontSize: w * 0.14, fontWeight: 900, color: accent, lineHeight: 0.5 }}>“</div>
-        <div style={{ display: "flex", fontSize: headlineSize * 0.9, ...headlineFill, ...headStyle, lineHeight: 1.1 }}>
-          {v.headline}
-        </div>
+        {rich(v.headline, headlineSize * 0.9)}
         {v.subline ? (
           <div style={{ display: "flex", fontSize: w * 0.024, color: sub, fontWeight: 600, marginTop: w * 0.01 }}>
             — {v.subline}
@@ -834,7 +895,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slide
   } else if (v.template === "punch") {
     body = (
       <div style={{ display: "flex", flexDirection: "column", gap: w * 0.02, maxWidth: "94%", alignItems: "flex-start" }}>
-        <div style={{ display: "flex", fontSize: headlineSize * 1.15, ...headlineFill, ...headStyle }}>{cs(v.headline)}</div>
+        {rich(v.headline, headlineSize * 1.15)}
         <div style={{ display: "flex", width: w * 0.14, height: w * 0.014, borderRadius: 8, background: accent }} />
         {v.subline ? (
           <div style={{ display: "flex", fontSize: w * 0.03, color: sub, fontWeight: 500, lineHeight: 1.3 }}>
@@ -847,9 +908,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slide
     body = (
       <div style={{ display: "flex", flexDirection: "column", gap: w * 0.02, maxWidth: "88%" }}>
         {stars(hasPhoto ? "#fff" : accent, w * 0.034)}
-        <div style={{ display: "flex", fontSize: headlineSize * 0.88, ...headlineFill, ...headStyle, lineHeight: 1.12 }}>
-          {cs(v.headline)}
-        </div>
+        {rich(v.headline, headlineSize * 0.88)}
         {v.subline ? (
           <div style={{ display: "flex", fontSize: w * 0.024, color: sub, fontWeight: 600 }}>— {v.subline}</div>
         ) : null}
@@ -912,7 +971,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slide
     );
   } else if (v.template === "match") {
     // Carte de match façon UI de l'app : deux profils + compatibilité + tags.
-    const names = v.headline
+    const names = stripRich(v.headline)
       .split(/\s*(?:\+|&|\bet\b)\s*/i)
       .map((s) => s.trim())
       .filter(Boolean)
@@ -1103,6 +1162,39 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slide
           ) : null}
         </div>
         {phone}
+      </div>
+    );
+  } else if (v.template === "editorial") {
+    // Éditorial : lignes à échelles contrastées (sans-serif black ↔ serif
+    // italique) + annotations satellites — le langage des studios de design.
+    const lines = v.headline.split(/\s*\|\s*/).filter(Boolean);
+    const notes = v.subline.split(/\s*[·•]\s*/).map((t) => t.trim()).filter(Boolean).slice(0, 3);
+    const note = (t: string, align: "flex-start" | "flex-end" | "center") => (
+      <div style={{ display: "flex", alignSelf: align, alignItems: "center", gap: 8,
+        fontSize: w * 0.019, color: sub, fontWeight: 600 }}>
+        <div style={{ width: 6, height: 6, borderRadius: 999, background: accent, display: "flex" }} />
+        {t}
+      </div>
+    );
+    body = (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: w * 0.02, width: "100%" }}>
+        {notes[0] ? note(notes[0], "flex-start") : null}
+        {(lines.length ? lines : [v.headline]).map((ln, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: "center", maxWidth: "94%" }}>
+            {richText(ln, {
+              size: headlineSize * (i % 2 ? 0.6 : 0.98),
+              color: ink, accent, onAccent,
+              weight: i % 2 ? 400 : 700,
+              family: i % 2 ? "Instrument Serif" : typo.family,
+              spacing: i % 2 ? 0 : typo.spacing,
+              lineHeight: 1.06,
+              uppercase: i % 2 ? false : true,
+              center: true,
+            })}
+          </div>
+        ))}
+        {notes[1] ? note(notes[1], "flex-end") : null}
+        {notes[2] ? note(notes[2], "center") : null}
       </div>
     );
   } else {

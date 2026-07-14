@@ -96,14 +96,15 @@ const POST_SCHEMA = {
             "match",
             "meme",
             "app",
+            "editorial",
           ],
           description:
-            "Gabarit adapté à l'angle : annonce (grand titre + preuve sociale), astuce (pastille conseil), stat (chiffre fort en très grand), citation (verbatim), duo (titre + accroche), checklist (points clés — mets-les dans subline séparés par « · »), punch (punchline plein cadre), temoignage (avis + étoiles), match (carte de match façon UI de l'app : headline = « Prénom + Prénom », subline = « NN % · tag · tag »), meme (motif géant + texte choc centré, énergie meme), app (vitrine produit : mockup téléphone montrant un match dans l'app — headline courte à gauche)",
+            "Gabarit adapté à l'angle : annonce (grand titre + preuve sociale), astuce (pastille conseil), stat (chiffre fort en très grand), citation (verbatim), duo (titre + accroche), checklist (points clés — mets-les dans subline séparés par « · »), punch (punchline plein cadre), temoignage (avis + étoiles), match (carte de match façon UI de l'app : headline = « Prénom + Prénom », subline = « NN % · tag · tag »), meme (motif géant + texte choc centré, énergie meme), app (vitrine produit : mockup téléphone), editorial (typo expressive centrée : lignes séparées par « | », alternance CAPITALES/serif italique, annotations dans subline séparées par « · » — le style studio de design)",
         },
         headline: {
           type: "string" as const,
           description:
-            "Punchline COURTE affichée en grand sur l'image (max 60 caractères). Pas un copier-coller du titre : pensée pour l'image. Pour stat : le chiffre seul (ex. « 3× », « +120 % »). Pour match : « Prénom + Prénom »",
+            "Punchline COURTE affichée en grand sur l'image (max 60 caractères). MARQUAGE OBLIGATOIRE : surligne 1-2 mots clés entre crochets [comme ça] (rendu marqueur), mets 1 mot émotionnel entre astérisques *comme ça* (serif italique) OU souligne _comme ça_. Ex. : « Ta coloc [idéale] existe *vraiment* ». Pas un copier-coller du titre. Pour stat : le chiffre seul (ex. « 3× », « +120 % »). Pour match : « Prénom + Prénom »",
         },
         subline: {
           type: "string" as const,
@@ -160,7 +161,7 @@ const POST_SCHEMA = {
             properties: {
               headline: {
                 type: "string" as const,
-                description: "L'idée de la slide, une phrase forte (max 70 caractères)",
+                description: "L'idée de la slide, une phrase forte (max 70 caractères) — surligne le mot clé [comme ça]",
               },
               subline: {
                 type: "string" as const,
