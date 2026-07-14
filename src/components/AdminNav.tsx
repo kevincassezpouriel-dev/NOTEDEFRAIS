@@ -30,11 +30,30 @@ export default function AdminNav() {
   return (
     <header
       className="sticky top-0 z-10 border-b"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      style={{
+        background: "var(--nav-bg)",
+        backdropFilter: "blur(14px)",
+        WebkitBackdropFilter: "blur(14px)",
+        borderColor: "var(--border)",
+      }}
     >
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-6">
-        <span className="font-semibold text-sm">▣ QR Platform</span>
-        <nav className="flex items-center gap-1 text-sm flex-1">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-5">
+        {/* Marque du studio : pastille dégradée + wordmark */}
+        <Link href="/admin" className="flex items-center gap-2.5 shrink-0">
+          <span
+            aria-hidden
+            className="w-6 h-6 rounded-lg inline-block"
+            style={{
+              background: "linear-gradient(135deg, var(--accent) 0%, var(--coral) 100%)",
+              boxShadow: "0 4px 12px -4px rgba(91,110,245,0.6)",
+            }}
+          />
+          <span className="font-display font-bold text-[15px] tracking-tight">
+            Growth&nbsp;Studio
+          </span>
+        </Link>
+
+        <nav className="flex items-center gap-0.5 text-sm flex-1 overflow-x-auto whitespace-nowrap">
           {LINKS.map((l) => {
             const active =
               l.href === "/admin" ? pathname === "/admin" : pathname.startsWith(l.href);
@@ -42,11 +61,11 @@ export default function AdminNav() {
               <Link
                 key={l.href}
                 href={l.href}
-                className="px-3 py-1.5 rounded-lg"
+                className="px-3 py-1.5 rounded-full transition-colors"
                 style={{
-                  color: active ? "var(--text-primary)" : "var(--text-secondary)",
-                  background: active ? "var(--page)" : "transparent",
-                  fontWeight: active ? 600 : 400,
+                  color: active ? "var(--accent)" : "var(--text-secondary)",
+                  background: active ? "var(--accent-soft)" : "transparent",
+                  fontWeight: active ? 650 : 450,
                 }}
               >
                 {l.label}
@@ -54,9 +73,10 @@ export default function AdminNav() {
             );
           })}
         </nav>
+
         <button
           onClick={logout}
-          className="text-sm"
+          className="text-xs shrink-0 px-3 py-1.5 rounded-full transition-colors hover:underline"
           style={{ color: "var(--text-muted)" }}
         >
           Déconnexion
