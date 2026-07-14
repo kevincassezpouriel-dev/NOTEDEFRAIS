@@ -51,6 +51,7 @@ export type Motif =
 export interface CarouselSlide {
   headline: string; // une idée par slide (≤ 90 caractères)
   subline: string; // développement court (≤ 130 caractères, peut être vide)
+  bgImage?: string | null; // photo générée/posée en fond de CETTE slide
 }
 
 export interface VisualSpec {
@@ -202,6 +203,8 @@ export function parseVisual(
             .map((sl) => ({
               headline: sl.headline.slice(0, 100),
               subline: (sl.subline ?? "").slice(0, 140),
+              bgImage:
+                typeof sl.bgImage === "string" && sl.bgImage.trim() ? sl.bgImage : null,
             }))
         : undefined,
     };
