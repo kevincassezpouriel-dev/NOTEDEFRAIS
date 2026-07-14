@@ -9,6 +9,8 @@ RUN npm ci
 COPY . .
 # DATABASE_URL factice : nécessaire à `prisma generate`, pas au build Next
 ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
+# Le mode standalone (server.js autonome) n'est activé que pour Docker
+ENV DOCKER_BUILD=1
 RUN npm run build
 
 # --- Étape 2 : image d'exécution minimale ---

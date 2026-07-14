@@ -1,4 +1,6 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getBrand, accentPool } from "@/lib/brand";
@@ -29,10 +31,15 @@ function loadFonts(origin: string) {
         name: f.name,
         weight: f.weight,
         style: "normal" as const,
-        data: await fetch(`${origin}/fonts/${f.file}`).then((r) => {
-          if (!r.ok) throw new Error(`police ${f.file} : ${r.status}`);
-          return r.arrayBuffer();
-        }),
+        // Disque d'abord (fiable sur Vercel, y compris derrière une
+        // protection de déploiement) ; HTTP en secours (dev, autres runtimes).
+        data: await readFile(path.join(process.cwd(), "public", "fonts", f.file))
+          .then((b) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer)
+          .catch(async () => {
+            const r = await fetch(`${origin}/fonts/${f.file}`);
+            if (!r.ok) throw new Error(`police ${f.file} : ${r.status}`);
+            return r.arrayBuffer();
+          }),
       }))
     ).catch((e) => {
       fontsPromise = null; // retentera à la prochaine requête
@@ -87,12 +94,33 @@ export async function GET(
   // Sans les polices embarquées, le rendu retombe sur la police système.
   const fonts = await loadFonts(req.nextUrl.origin).catch(() => []);
 
-  return new ImageResponse(render(visual, brand, width, height, slideIdx), {
-    width,
-    height,
-    ...(fonts.length ? { fonts } : {}),
-    headers: { "Cache-Control": "public, max-age=300" },
-  });
+  try {
+    return new ImageResponse(render(visual, brand, width, height, slideIdx), {
+      width,
+      height,
+      ...(fonts.length ? { fonts } : {}),
+      headers: { "Cache-Control": "public, max-age=300" },
+    });
+  } catch (err) {
+    // Jamais d'icône d'image cassée : SVG de secours aux couleurs de la
+    // marque + erreur dans les logs Vercel pour diagnostiquer.
+    console.error("Rendu OG échoué :", err);
+    const esc = (t: string) =>
+      t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="${brand.colorDark}"/>
+    <stop offset="1" stop-color="${brand.colorPrimary}"/>
+  </linearGradient></defs>
+  <rect width="100%" height="100%" fill="url(#g)"/>
+  <text x="6%" y="30%" fill="#ffffff" font-family="sans-serif" font-size="${Math.round(width * 0.03)}" font-weight="700" letter-spacing="2">${esc(brand.name.toUpperCase())}</text>
+  <text x="6%" y="55%" fill="#ffffff" font-family="sans-serif" font-size="${Math.round(width * 0.05)}" font-weight="800">${esc(visual.headline.slice(0, 40))}</text>
+  <text x="6%" y="88%" fill="rgba(255,255,255,0.7)" font-family="sans-serif" font-size="${Math.round(width * 0.02)}">${esc(brand.tagline)}</text>
+</svg>`;
+    return new Response(svg, {
+      headers: { "Content-Type": "image/svg+xml", "Cache-Control": "no-store" },
+    });
+  }
 }
 
 /* ---------- utilitaires couleur ---------- */
