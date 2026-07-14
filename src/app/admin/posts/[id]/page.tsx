@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useState } from "react";
-import { parseVisual, TEMPLATES, BG_STYLES, MOTIFS, type VisualSpec } from "@/lib/visual";
+import { parseVisual, TEMPLATES, BG_STYLES, MOTIFS, CHANNELS, type VisualSpec } from "@/lib/visual";
 
 /** Réduit une image de fond en JPEG ≤ 1280 px (data-URL) pour l'embarquer. */
 async function fileToBg(file: File): Promise<string> {
@@ -543,21 +543,73 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
                 )}
               </div>
             </div>
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              Formats fournis aux réseaux : 1200×630 (partages) ·{" "}
-              <a href={`/api/og/${post.slug}?format=carre`} target="_blank" className="underline">
-                carré 1080×1080 ↗
-              </a>{" "}
-              (feed Instagram) ·{" "}
-              <a href={`/api/og/${post.slug}?format=story`} target="_blank" className="underline">
-                story 1080×1920 ↗
-              </a>{" "}
-              (stories, TikTok) ·{" "}
-              <a href={`/api/og/${post.slug}?format=portrait`} target="_blank" className="underline">
-                portrait 1080×1350 ↗
-              </a>{" "}
-              (carrousels).
-            </p>
+            {/* Kit de publication : l'IA a choisi les réseaux, chaque visuel
+                est servi à la résolution officielle — rien à calculer. */}
+            <div className="border-t pt-3 space-y-2" style={{ borderColor: "var(--grid)" }}>
+              <p className="text-xs font-medium">
+                📤 Kit de publication{" "}
+                <span className="font-normal" style={{ color: "var(--text-muted)" }}>
+                  — l&apos;IA a choisi les réseaux ; clique un réseau pour l&apos;activer/le retirer,
+                  puis télécharge chaque visuel à la bonne résolution (clic droit → enregistrer).
+                </span>
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {CHANNELS.map((ch) => {
+                  const active = (visual.channels ?? []).includes(ch.value);
+                  return (
+                    <button key={ch.value} type="button"
+                      className="text-xs px-2.5 py-1 rounded-full"
+                      style={{
+                        border: `1px solid ${active ? "var(--accent)" : "var(--baseline)"}`,
+                        background: active ? "var(--accent-soft)" : "transparent",
+                        color: active ? "var(--accent)" : "var(--text-muted)",
+                        fontWeight: active ? 650 : 450,
+                      }}
+                      onClick={() => {
+                        const cur = visual.channels ?? [];
+                        setVisual({
+                          ...visual,
+                          channels: active ? cur.filter((c) => c !== ch.value) : [...cur, ch.value],
+                        });
+                      }}>
+                      {ch.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {(visual.channels ?? []).map((cv) => {
+                const ch = CHANNELS.find((c) => c.value === cv);
+                if (!ch) return null;
+                const fmt = ch.format ? `&format=${ch.format}` : "";
+                const fmt0 = ch.format ? `?format=${ch.format}` : "";
+                const n = visual.slides?.length ?? 0;
+                return (
+                  <div key={cv} className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-semibold w-36">{ch.label}</span>
+                    <span style={{ color: "var(--text-muted)" }}>{ch.size}</span>
+                    <a href={`/api/og/${post.slug}${fmt0}`} target="_blank" className="underline">
+                      {n > 0 ? "couverture ↗" : "visuel ↗"}
+                    </a>
+                    {n > 0 &&
+                      Array.from({ length: n + 1 }).map((_, i) => (
+                        <a key={i} href={`/api/og/${post.slug}?slide=${i + 1}${fmt}`}
+                          target="_blank" className="underline" style={{ color: "var(--text-muted)" }}>
+                          {i < n ? `s${i + 2} ↗` : "CTA ↗"}
+                        </a>
+                      ))}
+                  </div>
+                );
+              })}
+              <button type="button" className="btn btn-secondary !py-1 text-xs"
+                onClick={() => {
+                  navigator.clipboard.writeText(
+                    `${post.excerpt ?? post.title}\n\n${post.hashtags ?? ""}`.trim()
+                  );
+                  setMessage({ text: "✓ Légende + hashtags copiés — colle-les dans ton post.", error: false });
+                }}>
+                📋 Copier la légende + hashtags
+              </button>
+            </div>
           </div>
         )}
 

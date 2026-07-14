@@ -152,6 +152,15 @@ const POST_SCHEMA = {
           description:
             "Index (0+) d'une image de la bibliothèque de marque à poser en fond du visuel de couverture (la liste des images disponibles est fournie dans le brief), ou -1 pour aucune. Utilise un screen de l'app quand le post parle du produit.",
         },
+        channels: {
+          type: "array" as const,
+          items: {
+            type: "string" as const,
+            enum: ["instagram-feed", "instagram-story", "tiktok", "linkedin", "facebook", "x"],
+          },
+          description:
+            "RÉSEAUX CIBLES : choisis 2 à 4 réseaux adaptés au contenu (carrousel → instagram-feed en premier ; meme/punch → instagram-story + tiktok ; angle pro/chiffres → linkedin). Le kit de publication servira automatiquement le visuel à la résolution officielle de chaque réseau choisi.",
+        },
         slides: {
           type: "array" as const,
           description:
@@ -173,7 +182,7 @@ const POST_SCHEMA = {
           },
         },
       },
-      required: ["template", "headline", "subline", "accentIndex", "bg", "motif", "mode", "bgAsset", "slides"],
+      required: ["template", "headline", "subline", "accentIndex", "bg", "motif", "mode", "bgAsset", "channels", "slides"],
       additionalProperties: false,
     },
   },

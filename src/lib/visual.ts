@@ -66,7 +66,20 @@ export interface VisualSpec {
   // Carrousel : slides de contenu APRÈS la couverture (le visuel principal est
   // la slide 1 / hook) ; la slide CTA finale est composée automatiquement.
   slides?: CarouselSlide[];
+  // Réseaux cibles choisis par l'IA : le kit de publication sert chaque
+  // visuel à la résolution officielle du réseau.
+  channels?: string[];
 }
+
+/** Résolutions officielles par réseau — le kit de publication s'en sert. */
+export const CHANNELS: { value: string; label: string; format: string; size: string }[] = [
+  { value: "instagram-feed", label: "Instagram (feed)", format: "portrait", size: "1080×1350" },
+  { value: "instagram-story", label: "Instagram Story", format: "story", size: "1080×1920" },
+  { value: "tiktok", label: "TikTok", format: "story", size: "1080×1920" },
+  { value: "linkedin", label: "LinkedIn", format: "", size: "1200×630" },
+  { value: "facebook", label: "Facebook", format: "", size: "1200×630" },
+  { value: "x", label: "X (Twitter)", format: "", size: "1200×630" },
+];
 
 export const TEMPLATES: { value: Template; label: string }[] = [
   { value: "annonce", label: "Annonce (grand titre)" },
@@ -177,6 +190,9 @@ export function parseVisual(
       bgAsset:
         typeof v.bgAsset === "number" && v.bgAsset >= 0 ? Math.floor(v.bgAsset) : undefined,
       seed: typeof v.seed === "number" ? v.seed : fallback.seed,
+      channels: Array.isArray(v.channels)
+        ? v.channels.filter((c) => CHANNELS.some((ch) => ch.value === c)).slice(0, 6)
+        : undefined,
       slides: Array.isArray(v.slides)
         ? v.slides
             .filter((sl) => sl && typeof sl.headline === "string")
