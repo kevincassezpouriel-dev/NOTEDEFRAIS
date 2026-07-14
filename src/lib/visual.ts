@@ -19,7 +19,8 @@ export type Template =
   | "match"
   | "meme"
   | "app"
-  | "editorial";
+  | "editorial"
+  | "ia";
 
 export type BgStyle =
   | "auto"
@@ -94,6 +95,7 @@ export const TEMPLATES: { value: Template; label: string }[] = [
   { value: "meme", label: "Meme (motif géant + texte choc)" },
   { value: "app", label: "Vitrine app (mockup téléphone)" },
   { value: "editorial", label: "Éditorial (typo expressive)" },
+  { value: "ia", label: "Créa 100 % IA (image complète)" },
 ];
 
 export const BG_STYLES: { value: BgStyle; label: string }[] = [

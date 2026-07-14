@@ -88,7 +88,7 @@ export async function runMarketingCycle(origin: string): Promise<CycleResult> {
   if (autoBg) {
     await prisma.post.update({
       where: { id: draft.id },
-      data: { visual: JSON.stringify({ ...generated.visual, bgImage: autoBg }) },
+      data: { visual: JSON.stringify({ ...generated.visual, bgImage: autoBg, template: "ia" }) },
     });
   }
 

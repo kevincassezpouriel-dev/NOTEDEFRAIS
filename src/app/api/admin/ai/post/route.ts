@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
     const photoIdea = (generated.visual as { photoIdea?: string }).photoIdea;
     const bg = await tryAutoPhoto(generated.visual.headline, photoIdea);
     if (bg) {
-      const withPhoto = { ...generated.visual, bgImage: bg };
+      const withPhoto = { ...generated.visual, bgImage: bg, template: "ia" as const };
       const updated = await prisma.post.update({
         where: { id: post.id },
         data: { visual: JSON.stringify(withPhoto) },

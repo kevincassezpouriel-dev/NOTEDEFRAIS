@@ -97,6 +97,7 @@ const POST_SCHEMA = {
             "meme",
             "app",
             "editorial",
+            "ia",
           ],
           description:
             "Gabarit adapté à l'angle : annonce (grand titre + preuve sociale), astuce (pastille conseil), stat (chiffre fort en très grand), citation (verbatim), duo (titre + accroche), checklist (points clés — mets-les dans subline séparés par « · »), punch (punchline plein cadre), temoignage (avis + étoiles), match (carte de match façon UI de l'app : headline = « Prénom + Prénom », subline = « NN % · tag · tag »), meme (motif géant + texte choc centré, énergie meme), app (vitrine produit : mockup téléphone), editorial (typo expressive centrée : lignes séparées par « | », alternance CAPITALES/serif italique, annotations dans subline séparées par « · » — le style studio de design)",
@@ -155,7 +156,7 @@ const POST_SCHEMA = {
         photoIdea: {
           type: "string" as const,
           description:
-            "Si une VRAIE photo générée par IA renforcerait ce post (scène de vie en coloc, ambiance appart, moment authentique), décris la scène EN ANGLAIS en une phrase (sans aucun texte dans l'image). Chaîne vide sinon. Avec parcimonie : ~1 post sur 3, quand l'émotion humaine compte plus que le graphisme.",
+            "Si une VRAIE photo générée par IA renforcerait ce post (scène de vie en coloc, ambiance appart, moment authentique), décris la scène EN ANGLAIS en une phrase (sans aucun texte dans l'image). UTILISE-LA SUR LA PLUPART DES POSTS : c'est elle qui produit la créa finale complète (image + titre intégré, qualité agence). Chaîne vide seulement pour match/meme/stat.",
         },
         channels: {
           type: "array" as const,

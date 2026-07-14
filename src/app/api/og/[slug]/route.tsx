@@ -1233,8 +1233,12 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slide
         fontFamily: '"Space Grotesk", sans-serif',
       }}
     >
-      {/* Photo/meme en arrière-plan (facultatif) + voile de lisibilité */}
-      {hasPhoto ? (
+      {/* Créa 100 % IA : l'image EST le post, aucun habillage par-dessus */}
+      {hasPhoto && v.template === "ia" ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={v.bgImage as string} alt="" width={w} height={h}
+          style={{ position: "absolute", top: 0, left: 0, width: w, height: h, objectFit: "cover", display: "flex" }} />
+      ) : hasPhoto ? (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -1260,10 +1264,10 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slide
         backgroundLayers(style, seed, accent, accent2, dark, w, h, v.motif)
       )}
       {vignette}
-      {bar}
-      {topRow}
-      {body}
-      {footer}
+      {v.template === "ia" && hasPhoto ? null : bar}
+      {v.template === "ia" && hasPhoto ? null : topRow}
+      {v.template === "ia" && hasPhoto ? null : body}
+      {v.template === "ia" && hasPhoto ? null : footer}
     </div>
   );
 }

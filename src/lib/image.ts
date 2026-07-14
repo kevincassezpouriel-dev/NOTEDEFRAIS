@@ -36,12 +36,15 @@ export function buildImagePrompt(brand: BrandIdentity, opts: { headline?: string
     .join(", ");
   const focus = opts.headline || opts.angle || brand.tagline;
   return [
-    `Éditorial photography for a brand social visual. Brand: ${brand.name} — ${brand.description}`,
+    `Complete, finished social media post design (agency quality) for the brand ${brand.name} — ${brand.description}`,
+    opts.headline
+      ? `The design MUST feature this exact French headline, rendered large, bold and perfectly readable with premium editorial typography (highlight 1-2 key words with a marker-style colored background): « ${opts.headline.replace(/[\[\]*_]/g, "") } »`
+      : "",
     `Scene idea / angle: ${focus}.`,
     "Subject: young diverse roommates (18–30) in a bright, warm, real shared apartment in France — genuine candid lifestyle, natural light, cozy and friendly, aspirational but authentic.",
     `Color grading harmonised with the brand palette: ${palette}.`,
     "Composition: leave calm negative space (top-left and bottom) for text overlay. Modern, premium, magazine-quality.",
-    "ABSOLUTELY NO text, no words, no letters, no logos, no watermark, no UI. Photo only.",
+    "No watermark, no fake logos, no gibberish text — only the headline provided, spelled EXACTLY right.",
   ].join(" ");
 }
 
