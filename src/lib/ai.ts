@@ -271,6 +271,9 @@ export async function generateMarketingPost(opts: {
         .join("\n")}\n(-1 si aucune ne convient)`
     );
   }
+  parts.unshift(
+    "IDÉATION : avant d'écrire, fais 1 à 2 recherches web rapides (tendances colocation/logement du moment, actus, sujets qui émergent sur les réseaux) et choisis un angle ACTUEL et intéressant — jamais un sujet générique hors du temps."
+  );
   if (opts.channels?.length) {
     parts.push(
       `RÉSEAUX CIBLES IMPOSÉS : ${opts.channels.join(", ")}. Adapte le ton, le format et le gabarit à ces réseaux (LinkedIn → angle pro et chiffré ; TikTok/Story → punchline percutante ; feed Instagram → carrousel privilégié) et renseigne EXACTEMENT ces réseaux dans visual.channels.`
@@ -291,9 +294,15 @@ export async function generateMarketingPost(opts: {
       { type: "text", text: PLAYBOOK, cache_control: { type: "ephemeral" } },
     ],
     ...reqOpts(MODEL_WRITE, opts.research ? "high" : "medium", POST_SCHEMA),
-    ...(opts.research
-      ? { tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }] }
-      : {}),
+    // Idéation web systématique : 2-3 recherches rapides avant d'écrire
+    // (tendances, actus) ; le mode recherche approfondie en autorise 5.
+    tools: [
+      {
+        type: "web_search_20250305",
+        name: "web_search",
+        max_uses: opts.research ? 5 : 3,
+      },
+    ],
     messages: [{ role: "user", content: parts.join("\n\n") }],
   } as Anthropic.Messages.MessageCreateParamsNonStreaming);
 
