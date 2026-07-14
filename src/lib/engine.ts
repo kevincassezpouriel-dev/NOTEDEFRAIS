@@ -5,6 +5,7 @@ import { refreshLearnings, topLearnings } from "./learnings";
 import { performanceBrief } from "./performance";
 import { createPost, publishPost } from "./posts";
 import { parseVisual, describeVisual, diversifyVisual } from "./visual";
+import { tryAutoPhoto } from "./image";
 import { getSettings } from "./settings";
 import { logAction } from "./actions";
 import { sendEmail, emailShell, button } from "./email";
@@ -80,6 +81,16 @@ export async function runMarketingCycle(origin: string): Promise<CycleResult> {
     aiGenerated: true,
     visual: generated.visual,
   });
+
+  // Photo IA automatique pour le post de l'autopilote (jamais bloquante)
+  const autoPhotoIdea = (generated.visual as { photoIdea?: string }).photoIdea;
+  const autoBg = await tryAutoPhoto(generated.visual.headline, autoPhotoIdea);
+  if (autoBg) {
+    await prisma.post.update({
+      where: { id: draft.id },
+      data: { visual: JSON.stringify({ ...generated.visual, bgImage: autoBg }) },
+    });
+  }
 
   await logAction({
     type: "autopilot.run",

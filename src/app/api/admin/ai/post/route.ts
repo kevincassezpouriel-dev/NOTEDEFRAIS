@@ -7,9 +7,10 @@ import { topLearnings } from "@/lib/learnings";
 import { performanceBrief } from "@/lib/performance";
 import { assetUrl } from "@/lib/engine";
 import { parseVisual, describeVisual, diversifyVisual } from "@/lib/visual";
+import { tryAutoPhoto } from "@/lib/image";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /**
  * Génère un brouillon de post marketing avec Claude, en appliquant les
@@ -91,6 +92,18 @@ export async function POST(req: NextRequest) {
       aiGenerated: true,
       visual: generated.visual,
     });
+    // Photo IA automatique (si l'IA l'a demandée et qu'IMAGE_API_KEY est là) —
+    // après la création : un échec photo ne coûte jamais le post.
+    const photoIdea = (generated.visual as { photoIdea?: string }).photoIdea;
+    const bg = await tryAutoPhoto(generated.visual.headline, photoIdea);
+    if (bg) {
+      const withPhoto = { ...generated.visual, bgImage: bg };
+      const updated = await prisma.post.update({
+        where: { id: post.id },
+        data: { visual: JSON.stringify(withPhoto) },
+      });
+      return NextResponse.json(updated, { status: 201 });
+    }
     return NextResponse.json(post, { status: 201 });
   } catch (err) {
     console.error("Erreur de génération IA :", err);

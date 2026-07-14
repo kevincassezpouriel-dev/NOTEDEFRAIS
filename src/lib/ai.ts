@@ -152,6 +152,11 @@ const POST_SCHEMA = {
           description:
             "Index (0+) d'une image de la bibliothèque de marque à poser en fond du visuel de couverture (la liste des images disponibles est fournie dans le brief), ou -1 pour aucune. Utilise un screen de l'app quand le post parle du produit.",
         },
+        photoIdea: {
+          type: "string" as const,
+          description:
+            "Si une VRAIE photo générée par IA renforcerait ce post (scène de vie en coloc, ambiance appart, moment authentique), décris la scène EN ANGLAIS en une phrase (sans aucun texte dans l'image). Chaîne vide sinon. Avec parcimonie : ~1 post sur 3, quand l'émotion humaine compte plus que le graphisme.",
+        },
         channels: {
           type: "array" as const,
           items: {
@@ -182,7 +187,7 @@ const POST_SCHEMA = {
           },
         },
       },
-      required: ["template", "headline", "subline", "accentIndex", "bg", "motif", "mode", "bgAsset", "channels", "slides"],
+      required: ["template", "headline", "subline", "accentIndex", "bg", "motif", "mode", "bgAsset", "photoIdea", "channels", "slides"],
       additionalProperties: false,
     },
   },

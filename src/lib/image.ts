@@ -1,4 +1,5 @@
 import type { BrandIdentity } from "./brand";
+import { getBrand } from "./brand";
 
 /**
  * Génération d'IMAGES par IA (le « claude design » que tu voulais brancher).
@@ -88,5 +89,21 @@ export async function generateImage(prompt: string): Promise<string | null> {
     throw new Error("Réponse du fournisseur d'images inattendue (ni b64_json ni url).");
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+/**
+ * PHOTO AUTOMATIQUE : appelée pendant la génération d'un post quand l'IA a
+ * jugé qu'une vraie photo renforcerait le visuel (champ photoIdea). Ne casse
+ * JAMAIS la création du post : toute erreur renvoie simplement null.
+ */
+export async function tryAutoPhoto(headline: string, photoIdea?: string): Promise<string | null> {
+  if (!photoIdea?.trim() || !imageGenEnabled()) return null;
+  try {
+    const brand = await getBrand();
+    return await generateImage(buildImagePrompt(brand, { headline, angle: photoIdea }));
+  } catch (err) {
+    console.error("Photo automatique échouée (le post reste valide) :", err);
+    return null;
   }
 }
