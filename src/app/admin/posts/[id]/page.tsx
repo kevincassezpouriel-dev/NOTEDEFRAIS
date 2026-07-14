@@ -208,7 +208,10 @@ export default function PostEditPage({ params }: { params: Promise<{ id: string 
             </p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={`/api/og/${post.slug}?v=${visualVersion}`}
+              src={`/api/og/${post.slug}?v=${visualVersion}${(() => {
+                const first = CHANNELS.find((c) => (visual.channels ?? [])[0] === c.value);
+                return first?.format ? `&format=${first.format}` : "";
+              })()}`}
               alt="Aperçu du visuel du post"
               className="w-full max-w-lg rounded-lg border"
               style={{ borderColor: "var(--border)" }}

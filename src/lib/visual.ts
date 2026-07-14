@@ -230,7 +230,7 @@ export function diversifyVisual(spec: VisualSpec, recent: VisualSpec[]): VisualS
   const out = { ...spec };
   const last = recent[0];
 
-  if (recent.slice(0, 2).some((r) => r.template === out.template)) {
+  if (recent.slice(0, 3).some((r) => r.template === out.template)) {
     const counts = new Map<Template, number>(ALL_TEMPLATES.map((t) => [t, 0]));
     for (const r of recent) counts.set(r.template, (counts.get(r.template) ?? 0) + 1);
     counts.delete(out.template);
@@ -248,8 +248,11 @@ export function diversifyVisual(spec: VisualSpec, recent: VisualSpec[]): VisualS
     out.template = best;
   }
 
-  if (last && last.accentIndex === out.accentIndex) {
-    out.accentIndex = out.accentIndex + 1;
+  // Couleur : TOUJOURS différente du post précédent (rotation stricte).
+  if (last) {
+    out.accentIndex =
+      last.accentIndex === out.accentIndex ? out.accentIndex + 1 : out.accentIndex;
+    if (recent[1] && recent[1].accentIndex === out.accentIndex) out.accentIndex += 1;
   }
 
   if (last && last.bg !== "auto" && last.bg === out.bg) {
