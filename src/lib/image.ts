@@ -21,6 +21,38 @@ import { getBrand } from "./brand";
  * post (champ bgImage).
  */
 
+/* ---------- PHOTOS DE BANQUE GRATUITES (Pexels) ----------
+ * Clé gratuite sur pexels.com/api (200 req/h, 20 000/mois) ; photos libres
+ * pour usage commercial, sans attribution. C'est la voie « 0 € » : vraie
+ * photo professionnelle en fond + notre typographie par-dessus = rendu
+ * agence, texte toujours parfait, coût nul. On stocke l'URL (léger).
+ */
+export function stockEnabled(): boolean {
+  return Boolean(process.env.PEXELS_API_KEY);
+}
+
+export async function searchStockPhoto(query: string): Promise<string | null> {
+  const key = process.env.PEXELS_API_KEY;
+  if (!key || !query.trim()) return null;
+  try {
+    const res = await fetch(
+      `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=8&orientation=landscape`,
+      { headers: { Authorization: key }, signal: AbortSignal.timeout(10000) }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      photos?: { src?: { large2x?: string; large?: string } }[];
+    };
+    const photos = (data.photos ?? []).filter((ph) => ph.src?.large2x || ph.src?.large);
+    if (!photos.length) return null;
+    // Variété : pas toujours la 1re photo du classement
+    const pick = photos[Math.floor(Math.random() * Math.min(photos.length, 5))];
+    return pick.src?.large2x ?? pick.src?.large ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function imageGenEnabled(): boolean {
   return Boolean(process.env.IMAGE_API_KEY || process.env.OPENAI_API_KEY || process.env.OPENAI_API_KE);
 }
@@ -101,12 +133,11 @@ export async function generateImage(prompt: string): Promise<string | null> {
  * JAMAIS la création du post : toute erreur renvoie simplement null.
  */
 export async function tryAutoPhoto(headline: string, photoIdea?: string): Promise<string | null> {
-  if (!photoIdea?.trim() || !imageGenEnabled()) return null;
-  try {
-    const brand = await getBrand();
-    return await generateImage(buildImagePrompt(brand, { headline, angle: photoIdea }));
-  } catch (err) {
-    console.error("Photo automatique échouée (le post reste valide) :", err);
-    return null;
-  }
+  if (!photoIdea?.trim()) return null;
+  // 1. Banque de photos gratuite (Pexels) : vraie photo pro, coût 0 €.
+  const stock = await searchStockPhoto(photoIdea);
+  if (stock) return stock;
+  // 2. Sans clé Pexels : pas de génération payante automatique — l'IA image
+  //    (OpenAI) reste disponible via le bouton manuel de l'éditeur.
+  return null;
 }

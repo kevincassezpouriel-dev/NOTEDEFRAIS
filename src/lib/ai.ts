@@ -156,7 +156,7 @@ const POST_SCHEMA = {
         photoIdea: {
           type: "string" as const,
           description:
-            "Si une VRAIE photo générée par IA renforcerait ce post (scène de vie en coloc, ambiance appart, moment authentique), décris la scène EN ANGLAIS en une phrase (sans aucun texte dans l'image). UTILISE-LA SUR LA PLUPART DES POSTS : c'est elle qui produit la créa finale complète (image + titre intégré, qualité agence). Chaîne vide seulement pour match/meme/stat.",
+            "MOTS-CLÉS ANGLAIS (2-4 mots) de recherche dans une banque de photos professionnelles pour le fond du visuel — ex. « friends rooftop bar », « students moving boxes apartment », « cozy shared kitchen ». UTILISE-LES SUR LA PLUPART DES POSTS (une vraie photo en fond + notre typographie = rendu premium). Chaîne vide pour match/meme/stat.",
         },
         channels: {
           type: "array" as const,
@@ -186,7 +186,7 @@ const POST_SCHEMA = {
               photoIdea: {
                 type: "string" as const,
                 description:
-                  "Description EN ANGLAIS de la photo d'illustration de cette slide (ambiance du lieu, scène réaliste, aucun texte). Obligatoire pour les lieux réels ; chaîne vide sinon.",
+                  "MOTS-CLÉS ANGLAIS (2-4 mots) de recherche photo pour cette slide — ex. « wine bar terrace lyon ». Obligatoire pour les lieux réels ; chaîne vide sinon.",
               },
             },
             required: ["headline", "subline", "photoIdea"],
@@ -277,9 +277,11 @@ export async function generateMarketingPost(opts: {
         .join("\n")}\n(-1 si aucune ne convient)`
     );
   }
-  parts.unshift(
-    "IDÉATION : avant d'écrire, fais 1 à 2 recherches web rapides (tendances colocation/logement du moment, actus, sujets qui émergent sur les réseaux) et choisis un angle ACTUEL et intéressant — jamais un sujet générique hors du temps."
-  );
+  if (!opts.brief) {
+    parts.unshift(
+      "IDÉATION : avant d'écrire, fais 1 à 2 recherches web rapides (tendances colocation/logement du moment, actus) et choisis un angle ACTUEL et intéressant — jamais un sujet générique hors du temps."
+    );
+  }
   if (opts.channels?.length) {
     parts.push(
       `RÉSEAUX CIBLES IMPOSÉS : ${opts.channels.join(", ")}. Adapte le ton, le format et le gabarit à ces réseaux (LinkedIn → angle pro et chiffré ; TikTok/Story → punchline percutante ; feed Instagram → carrousel privilégié) et renseigne EXACTEMENT ces réseaux dans visual.channels.`
@@ -302,13 +304,15 @@ export async function generateMarketingPost(opts: {
     ...reqOpts(MODEL_WRITE, opts.research ? "high" : "medium", POST_SCHEMA),
     // Idéation web systématique : 2-3 recherches rapides avant d'écrire
     // (tendances, actus) ; le mode recherche approfondie en autorise 5.
-    tools: [
-      {
-        type: "web_search_20250305",
-        name: "web_search",
-        max_uses: opts.research ? 5 : 3,
-      },
-    ],
+    // Coût maîtrisé : recherche web seulement si utile (recherche approfondie
+    // demandée, ou pas de brief → idéation courte).
+    ...(opts.research || !opts.brief
+      ? {
+          tools: [
+            { type: "web_search_20250305", name: "web_search", max_uses: opts.research ? 5 : 2 },
+          ],
+        }
+      : {}),
     messages: [{ role: "user", content: parts.join("\n\n") }],
   } as Anthropic.Messages.MessageCreateParamsNonStreaming);
 

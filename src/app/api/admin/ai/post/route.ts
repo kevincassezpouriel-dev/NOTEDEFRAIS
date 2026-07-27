@@ -108,9 +108,9 @@ export async function POST(req: NextRequest) {
     }
     const bg = await tryAutoPhoto(generated.visual.headline, photoIdea);
     if (bg || made > 0) {
-      const withPhoto = bg
-        ? { ...generated.visual, bgImage: bg, template: "ia" as const }
-        : { ...generated.visual };
+      // Photo de banque en fond + notre typographie par-dessus (rendu agence,
+      // texte parfait) — plus de créa IA plein cadre automatique (coûteuse).
+      const withPhoto = bg ? { ...generated.visual, bgImage: bg } : { ...generated.visual };
       const updated = await prisma.post.update({
         where: { id: post.id },
         data: { visual: JSON.stringify(withPhoto) },
