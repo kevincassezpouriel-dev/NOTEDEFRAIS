@@ -20,7 +20,9 @@ export type Template =
   | "meme"
   | "app"
   | "editorial"
-  | "ia";
+  | "ia"
+  | "echo"
+  | "polaroid";
 
 export type BgStyle =
   | "auto"
@@ -97,6 +99,8 @@ export const TEMPLATES: { value: Template; label: string }[] = [
   { value: "app", label: "Vitrine app (mockup téléphone)" },
   { value: "editorial", label: "Éditorial (typo expressive)" },
   { value: "ia", label: "Créa 100 % IA (image complète)" },
+  { value: "echo", label: "Écho (mot géant répété + carte photo)" },
+  { value: "polaroid", label: "Polaroid (photo + insets inclinés)" },
 ];
 
 export const BG_STYLES: { value: BgStyle; label: string }[] = [

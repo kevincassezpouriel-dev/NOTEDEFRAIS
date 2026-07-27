@@ -98,9 +98,11 @@ const POST_SCHEMA = {
             "app",
             "editorial",
             "ia",
+            "echo",
+            "polaroid",
           ],
           description:
-            "Gabarit adapté à l'angle : annonce (grand titre + preuve sociale), astuce (pastille conseil), stat (chiffre fort en très grand), citation (verbatim), duo (titre + accroche), checklist (points clés — mets-les dans subline séparés par « · »), punch (punchline plein cadre), temoignage (avis + étoiles), match (carte de match façon UI de l'app : headline = « Prénom + Prénom », subline = « NN % · tag · tag »), meme (motif géant + texte choc centré, énergie meme), app (vitrine produit : mockup téléphone), editorial (typo expressive centrée : lignes séparées par « | », alternance CAPITALES/serif italique, annotations dans subline séparées par « · » — le style studio de design)",
+            "Gabarit adapté à l'angle : annonce (grand titre + preuve sociale), astuce (pastille conseil), stat (chiffre fort en très grand), citation (verbatim), duo (titre + accroche), checklist (points clés — mets-les dans subline séparés par « · »), punch (punchline plein cadre), temoignage (avis + étoiles), match (carte de match façon UI de l'app : headline = « Prénom + Prénom », subline = « NN % · tag · tag »), meme (motif géant + texte choc centré, énergie meme), app (vitrine produit : mockup téléphone), editorial (typo expressive centrée : lignes séparées par « | », alternance CAPITALES/serif italique, annotations dans subline séparées par « · »), echo (UN MOT-CHOC de 4 à 12 caractères en headline, répété géant façon studio + carte photo + sticker subline), polaroid (photo plein cadre + polaroids des slides + bulle de légende — headline courte, parfait pour les listes de lieux et les vibes créateur)",
         },
         headline: {
           type: "string" as const,

@@ -539,7 +539,7 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slide
   const dark = v.mode === "sombre";
   const style: BgStyle =
     v.bg === "auto" ? AUTO_STYLES[(seed + slideIdx) % AUTO_STYLES.length] : v.bg;
-  const hasPhoto = Boolean(v.bgImage);
+  const hasPhoto = Boolean(v.bgImage) && v.template !== "echo";
 
   const baseDark = luminance(brand.colorDark) < 0.5 ? brand.colorDark : "#0d1b2e";
   const bg = dark
@@ -1167,6 +1167,142 @@ function render(v: VisualSpec, brand: BrandIdentity, w: number, h: number, slide
           ) : null}
         </div>
         {phone}
+      </div>
+    );
+  } else if (v.template === "echo") {
+    // ÉCHO (style studio) : le mot-clé répété en géant — une ligne pleine
+    // entre des lignes « fantômes » — avec une carte photo qui CHEVAUCHE le
+    // texte (profondeur par superposition) et un sticker.
+    const word = stripRich(v.headline);
+    const size = Math.min(headlineSize * 1.5, (w * 0.92) / Math.max(4, word.length) / 0.52);
+    const photoCard = v.bgImage ? (
+      <div
+        style={{
+          position: "absolute",
+          right: pad * 0.9,
+          top: h * 0.2,
+          width: w * 0.3,
+          height: h * 0.56,
+          borderRadius: 22,
+          border: "5px solid #ffffff",
+          transform: "rotate(3deg)",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
+          display: "flex",
+          overflow: "hidden",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={v.bgImage} alt="" width={w * 0.3} height={h * 0.56}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      </div>
+    ) : null;
+    body = (
+      <div style={{ display: "flex", flexDirection: "column", width: "100%", gap: size * 0.02 }}>
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              fontSize: size,
+              fontFamily: typo.family,
+              fontWeight: 700,
+              letterSpacing: -1,
+              lineHeight: 0.98,
+              color: i === 1 ? accent : rgba(ink, 0.13),
+            }}
+          >
+            {word.toUpperCase()}
+          </div>
+        ))}
+        {v.subline ? (
+          <div
+            style={{
+              display: "flex",
+              alignSelf: "flex-start",
+              alignItems: "center",
+              gap: 10,
+              marginTop: size * 0.12,
+              background: "#ffffff",
+              color: "#171a2b",
+              fontSize: w * 0.021,
+              fontWeight: 700,
+              padding: `${w * 0.011}px ${w * 0.02}px`,
+              borderRadius: 14,
+              boxShadow: "0 10px 26px rgba(0,0,0,0.25)",
+              transform: "rotate(-2deg)",
+            }}
+          >
+            {motifSvg(v.motif === "aucun" ? "eclair" : v.motif, accent, w * 0.026)}
+            {v.subline}
+          </div>
+        ) : null}
+        {photoCard}
+      </div>
+    );
+  } else if (v.template === "polaroid") {
+    // POLAROID (style feed créateur) : photo plein cadre (gérée par le fond)
+    // + 1-2 polaroids inclinés issus des slides + bulle de légende.
+    const insets = (v.slides ?? [])
+      .map((sl) => sl.bgImage)
+      .filter((im): im is string => Boolean(im))
+      .slice(0, 2);
+    const polaroid = (im: string, i: number) => (
+      <div
+        key={i}
+        style={{
+          position: "absolute",
+          ...(i === 0
+            ? { right: pad * 0.8, top: h * 0.16 }
+            : { left: pad * 0.8, bottom: h * 0.2 }),
+          width: w * 0.16,
+          borderRadius: 10,
+          background: "#ffffff",
+          padding: w * 0.008,
+          paddingBottom: w * 0.03,
+          transform: `rotate(${i === 0 ? 5 : -6}deg)`,
+          boxShadow: "0 16px 40px rgba(0,0,0,0.35)",
+          display: "flex",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={im} alt="" width={w * 0.144} height={w * 0.144}
+          style={{ width: "100%", height: w * 0.144, objectFit: "cover", borderRadius: 6 }} />
+      </div>
+    );
+    body = (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: w * 0.02, width: "100%" }}>
+        <div style={{ display: "flex", justifyContent: "center", maxWidth: "80%" }}>
+          {richText(v.headline, {
+            size: headlineSize,
+            color: "#ffffff",
+            accent,
+            onAccent,
+            weight: typo.weight,
+            family: typo.family,
+            spacing: typo.spacing,
+            lineHeight: 1.04,
+            uppercase: false,
+            center: true,
+          })}
+        </div>
+        {v.subline ? (
+          <div
+            style={{
+              display: "flex",
+              background: "#ffffff",
+              color: "#171a2b",
+              fontSize: w * 0.021,
+              fontWeight: 600,
+              padding: `${w * 0.011}px ${w * 0.022}px`,
+              borderRadius: 999,
+              boxShadow: "0 10px 26px rgba(0,0,0,0.3)",
+              transform: "rotate(-1.5deg)",
+            }}
+          >
+            {v.subline}
+          </div>
+        ) : null}
+        {insets.map((im, i) => polaroid(im, i))}
       </div>
     );
   } else if (v.template === "editorial") {
