@@ -790,3 +790,82 @@ export async function generateCampaignIdeas(context: {
   const parsed = JSON.parse(blocks[blocks.length - 1]?.text ?? "{}") as { ideas?: CampaignIdea[] };
   return parsed.ideas ?? [];
 }
+
+const EMAIL_SCHEMA = {
+  type: "object" as const,
+  properties: {
+    subject: {
+      type: "string" as const,
+      description:
+        "Objet de l'e-mail (max 55 caractères) : curiosité ou bénéfice concret, jamais racoleur — c'est lui qui fait le taux d'ouverture",
+    },
+    preheader: {
+      type: "string" as const,
+      description: "Texte d'aperçu dans la boîte de réception (max 90 caractères), complète l'objet",
+    },
+    intro: {
+      type: "string" as const,
+      description: "Accroche d'ouverture (2-3 phrases, tutoiement, dans la voix de la marque)",
+    },
+    sections: {
+      type: "array" as const,
+      description: "1 à 3 sections courtes (stratégie 80/20 : de la valeur d'abord)",
+      items: {
+        type: "object" as const,
+        properties: {
+          title: { type: "string" as const, description: "Titre de section (max 60 caractères)" },
+          body: { type: "string" as const, description: "2-4 phrases utiles, **gras** autorisé" },
+        },
+        required: ["title", "body"],
+        additionalProperties: false,
+      },
+    },
+    ctaLabel: { type: "string" as const, description: "Libellé du bouton (max 30 caractères)" },
+  },
+  required: ["subject", "preheader", "intro", "sections", "ctaLabel"],
+  additionalProperties: false,
+};
+
+export interface GeneratedEmail {
+  subject: string;
+  preheader: string;
+  intro: string;
+  sections: { title: string; body: string }[];
+  ctaLabel: string;
+}
+
+/**
+ * Génère une campagne e-mail dans la voix de la marque (stratégie 80/20,
+ * objets travaillés pour l'ouverture, sections de valeur, CTA unique).
+ */
+export async function generateEmailCampaign(opts: {
+  brief?: string;
+  recentSubjects?: string[];
+  learnings?: string[];
+}): Promise<GeneratedEmail> {
+  const brand = await getBrand();
+  const parts: string[] = [
+    opts.brief
+      ? `Brief de la campagne e-mail :\n${opts.brief}`
+      : "Écris la prochaine campagne e-mail aux inscrits. Applique la stratégie 80/20 : de la vraie valeur (bons plans, astuces coloc, vie étudiante) avec au plus une touche produit.",
+  ];
+  if (opts.recentSubjects?.length)
+    parts.push(`Objets déjà envoyés (ne te répète pas) :\n- ${opts.recentSubjects.join("\n- ")}`);
+  if (opts.learnings?.length)
+    parts.push(`Apprentissages (applique-les) :\n- ${opts.learnings.join("\n- ")}`);
+
+  const response = await client().messages.create({
+    model: MODEL_WRITE,
+    max_tokens: 6000,
+    system: [
+      { type: "text", text: buildBrandSystem(brand) },
+      { type: "text", text: PLAYBOOK, cache_control: { type: "ephemeral" } },
+    ],
+    ...reqOpts(MODEL_WRITE, "medium", EMAIL_SCHEMA),
+    messages: [{ role: "user", content: parts.join("\n\n") }],
+  } as Anthropic.Messages.MessageCreateParamsNonStreaming);
+
+  if (response.stop_reason === "refusal") throw new Error("Génération refusée par le modèle.");
+  const blocks = response.content.filter((b) => b.type === "text");
+  return JSON.parse(blocks[blocks.length - 1]?.text ?? "") as GeneratedEmail;
+}

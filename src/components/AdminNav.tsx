@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/admin/posts", label: "Posts" },
   { href: "/admin/calendrier", label: "Calendrier" },
   { href: "/admin/veille", label: "Veille" },
+  { href: "/admin/emails", label: "E-mails" },
   { href: "/admin/marque", label: "Marque & IA" },
   { href: "/admin/reglages", label: "Réglages" },
   { href: "/admin/rgpd", label: "RGPD" },

@@ -157,3 +157,54 @@ model Conversion {
 
   @@index([qrCodeId, createdAt])
 }
+
+/// Contact e-mail (inscrit via l'app, importé, ou ajouté à la main).
+model Contact {
+  id             String       @id @default(cuid())
+  email          String       @unique
+  name           String?
+  source         String? // app | import | manuel
+  subscribed     Boolean      @default(true)
+  attributes     String? // profil JSON libre issu du CSV : { genre, age, statut, interets, … }
+  createdAt      DateTime     @default(now())
+  unsubscribedAt DateTime?
+  events         EmailEvent[]
+
+  @@index([subscribed])
+}
+
+/// Campagne e-mail (générée par l'IA ou écrite à la main).
+model EmailCampaign {
+  id          String       @id @default(cuid())
+  subject     String
+  preheader   String? // texte d'aperçu dans la boîte de réception
+  content     String // blocs JSON : { intro, sections[{title,body}], ctaLabel, ctaUrl }
+  status      String       @default("draft") // draft | sent
+  aiGenerated Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  sentAt      DateTime?
+  sentCount   Int          @default(0)
+  events      EmailEvent[]
+}
+
+/// Ouverture ou clic — unique par contact/campagne/type (taux uniques).
+model EmailEvent {
+  id         String        @id @default(cuid())
+  campaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+  contact    Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId  String
+  type       String // open | click
+  createdAt  DateTime      @default(now())
+
+  @@unique([campaignId, contactId, type])
+  @@index([campaignId, type])
+}
+
+/// Liste ciblée : règles de filtre sur les attributs de profil des contacts.
+model Segment {
+  id        String   @id @default(cuid())
+  name      String
+  rules     String // JSON : [{ key, op: contient|egal|min|max, value }]
+  createdAt DateTime @default(now())
+}

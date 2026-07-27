@@ -26,7 +26,7 @@ export async function logAction(input: {
   detail?: string | null;
   campaignId?: string | null;
   status?: "done" | "pending" | "failed";
-  refType?: "post" | "qr" | null;
+  refType?: "post" | "qr" | "email" | null;
   refId?: string | null;
 }): Promise<void> {
   try {
