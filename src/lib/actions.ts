@@ -24,9 +24,8 @@ export async function logAction(input: {
   title: string;
   actor?: Actor;
   detail?: string | null;
-  campaignId?: string | null;
   status?: "done" | "pending" | "failed";
-  refType?: "post" | "qr" | "email" | null;
+  refType?: "proprietaire" | "annonce" | "candidature" | "transmission" | "qr" | "email" | null;
   refId?: string | null;
 }): Promise<void> {
   try {
@@ -36,7 +35,6 @@ export async function logAction(input: {
         title: input.title,
         actor: input.actor ?? "human",
         detail: input.detail ?? null,
-        campaignId: input.campaignId ?? null,
         status: input.status ?? "done",
         refType: input.refType ?? null,
         refId: input.refId ?? null,

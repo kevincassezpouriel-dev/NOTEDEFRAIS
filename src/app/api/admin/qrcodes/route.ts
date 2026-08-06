@@ -10,7 +10,6 @@ export async function GET() {
     orderBy: { createdAt: "asc" },
     include: {
       _count: { select: { scans: true, conversions: true } },
-      campaign: { select: { id: true, name: true } },
     },
   });
   return NextResponse.json(
@@ -54,7 +53,6 @@ export async function POST(req: NextRequest) {
       slug,
       type: body.type === "link" ? "link" : "qr",
       channel: body.channel?.trim() || null,
-      campaignId: body.campaignId || null,
       appStoreUrl: body.appStoreUrl?.trim() ?? "",
       playStoreUrl: body.playStoreUrl?.trim() ?? "",
       fallbackUrl: body.fallbackUrl?.trim() ?? "",
@@ -63,7 +61,6 @@ export async function POST(req: NextRequest) {
   await logAction({
     type: "asset.created",
     title: `${qr.type === "link" ? "Lien" : "QR code"} créé : « ${qr.name} »`,
-    campaignId: qr.campaignId,
     refType: "qr",
     refId: qr.id,
   });

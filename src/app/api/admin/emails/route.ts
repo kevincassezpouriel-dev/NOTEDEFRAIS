@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { aiEnabled, generateEmailCampaign } from "@/lib/ai";
-import { topLearnings } from "@/lib/learnings";
-import { assetUrl } from "@/lib/engine";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -38,16 +36,15 @@ export async function POST(req: NextRequest) {
   }
   const body = (await req.json().catch(() => ({}))) as { brief?: string };
   const origin = process.env.APP_BASE_URL || req.nextUrl.origin;
-  const [recent, learnings, asset] = await Promise.all([
-    prisma.emailCampaign.findMany({ select: { subject: true }, orderBy: { createdAt: "desc" }, take: 8 }),
-    topLearnings(),
-    prisma.qrCode.findFirst({ orderBy: { createdAt: "asc" } }),
-  ]);
+  const recent = await prisma.emailCampaign.findMany({
+    select: { subject: true },
+    orderBy: { createdAt: "desc" },
+    take: 8,
+  });
   try {
     const g = await generateEmailCampaign({
       brief: body.brief?.trim() || undefined,
-      recentSubjects: recent.map((r) => r.subject),
-      learnings,
+      recentSubjects: recent.map((r: { subject: string }) => r.subject),
     });
     const campaign = await prisma.emailCampaign.create({
       data: {
@@ -58,7 +55,7 @@ export async function POST(req: NextRequest) {
           intro: g.intro,
           sections: g.sections,
           ctaLabel: g.ctaLabel,
-          ctaUrl: `${assetUrl(origin, asset)}?utm_source=email`,
+          ctaUrl: `${origin}/colocations?utm_source=email`,
         }),
       },
     });

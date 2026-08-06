@@ -27,7 +27,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     name?: string;
     slug?: string;
     channel?: string | null;
-    campaignId?: string | null;
     appStoreUrl?: string;
     playStoreUrl?: string;
     fallbackUrl?: string;
@@ -57,7 +56,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         ...(body.name !== undefined ? { name: body.name.trim() } : {}),
         ...(body.slug !== undefined ? { slug: body.slug } : {}),
         ...(body.channel !== undefined ? { channel: body.channel?.trim() || null } : {}),
-        ...(body.campaignId !== undefined ? { campaignId: body.campaignId || null } : {}),
         ...(body.appStoreUrl !== undefined ? { appStoreUrl: body.appStoreUrl.trim() } : {}),
         ...(body.playStoreUrl !== undefined ? { playStoreUrl: body.playStoreUrl.trim() } : {}),
         ...(body.fallbackUrl !== undefined ? { fallbackUrl: body.fallbackUrl.trim() } : {}),

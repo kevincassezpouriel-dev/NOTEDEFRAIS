@@ -5,15 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 
 const LINKS = [
   { href: "/admin", label: "Tableau de bord" },
-  { href: "/admin/campaigns", label: "Campagnes" },
+  { href: "/admin/proprietaires", label: "Propriétaires" },
+  { href: "/admin/annonces", label: "Annonces" },
+  { href: "/admin/candidatures", label: "Candidatures" },
+  { href: "/admin/transmissions", label: "Transmissions" },
   { href: "/admin/qrcodes", label: "QR & liens" },
-  { href: "/admin/posts", label: "Posts" },
-  { href: "/admin/calendrier", label: "Calendrier" },
-  { href: "/admin/veille", label: "Veille" },
   { href: "/admin/emails", label: "E-mails" },
-  { href: "/admin/marque", label: "Marque & IA" },
-  { href: "/admin/reglages", label: "Réglages" },
-  { href: "/admin/rgpd", label: "RGPD" },
 ];
 
 export default function AdminNav() {
@@ -38,8 +35,7 @@ export default function AdminNav() {
         borderColor: "var(--border)",
       }}
     >
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-5">
-        {/* Marque du studio : pastille dégradée + wordmark */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-5">
         <Link href="/admin" className="flex items-center gap-2.5 shrink-0">
           <span
             aria-hidden
@@ -49,9 +45,7 @@ export default function AdminNav() {
               boxShadow: "0 4px 12px -4px rgba(91,110,245,0.6)",
             }}
           />
-          <span className="font-display font-bold text-[15px] tracking-tight">
-            Growth&nbsp;Studio
-          </span>
+          <span className="font-display font-bold text-[15px] tracking-tight">Minggle&nbsp;Terrain</span>
         </Link>
 
         <nav className="flex items-center gap-0.5 text-sm flex-1 overflow-x-auto whitespace-nowrap">

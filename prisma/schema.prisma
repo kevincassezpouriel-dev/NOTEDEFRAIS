@@ -7,118 +7,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Une Campagne = un OBJECTIF marketing (Lancement v2, Salon de Paris,
-/// Acquisition Instagram Q1…). C'est l'unité d'organisation centrale : elle
-/// relie ses assets trackés (QR codes + liens), ses posts, sa timeline
-/// d'actions et les apprentissages que l'IA en tire. Une campagne peut donc
-/// regrouper PLUSIEURS points d'acquisition (un QR flyer + un lien bio + un
-/// lien e-mail) au service d'un même but, et mesurer le tout ensemble.
-model Campaign {
-  id         String     @id @default(cuid())
-  name       String
-  objective  String? // le but en une phrase, sert aussi de contexte à l'IA
-  status     String     @default("active") // active | paused | archived
-  createdAt  DateTime   @default(now())
-  archivedAt DateTime?
-  assets     QrCode[]
-  posts      Post[]
-  actions    Action[]
-  learnings  Learning[]
-}
+// ============================================================
+//  ACQUISITION — QR codes & liens trackés
+//  Un QR = un point d'acquisition (un flyer, un lieu, un canal).
+//  C'est lui qui répond à « quel flyer, quel lieu convertit ».
+// ============================================================
 
 /// Un asset tracké : un QR code OU un lien de suivi. Les URLs de destination
 /// sont modifiables sans changer le QR/lien : il pointe toujours vers
-/// /r/{slug} (ou /l/{slug}). Rattaché à une campagne (optionnel).
+/// /r/{slug} (ou /l/{slug}).
 model QrCode {
   id           String       @id @default(cuid())
-  name         String
+  name         String // ex. « Flyer campus Roberval », « Affiche gare »
   slug         String       @unique
   type         String       @default("qr") // "qr" | "link"
-  channel      String? // canal marketing : instagram, tiktok, email, flyer…
+  channel      String? // flyer | instagram | affiche | terrain…
   appStoreUrl  String
   playStoreUrl String
   fallbackUrl  String
   logo         String? // logo au centre du QR, stocké en data-URL (max ~200 Ko)
   active       Boolean      @default(true)
   createdAt    DateTime     @default(now())
-  campaign     Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  campaignId   String?
   scans        ScanEvent[]
   conversions  Conversion[]
-  posts        Post[]
-
-  @@index([campaignId])
-}
-
-/// Post marketing publié sur le site (/news), rédigé à la main ou généré
-/// par Claude. À la publication, un webhook (SOCIAL_WEBHOOK_URL) peut
-/// relayer le post vers les réseaux sociaux via Zapier/Make/Buffer.
-/// utmSource unique ("post-{slug}") = attribution des clics/installs au post.
-model Post {
-  id          String    @id @default(cuid())
-  title       String
-  slug        String    @unique
-  excerpt     String?
-  content     String // markdown simple
-  hashtags    String? // séparés par des espaces, ex. "#MINGGLE #app"
-  status      String    @default("draft") // draft | scheduled | published
-  aiGenerated Boolean   @default(false)
-  visual      String? // spec visuelle JSON (gabarit, accroche, accent, mode) — rendue par /api/og/{slug}
-  utmSource   String?   @unique // "post-{slug}" — clé d'attribution (rempli à la création)
-  scheduledAt DateTime? // publication programmée (calendrier éditorial)
-  qrCode      QrCode?   @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
-  qrCodeId    String?
-  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  campaignId  String?
-  createdAt   DateTime  @default(now())
-  publishedAt DateTime?
-
-  @@index([campaignId])
-  @@index([status, scheduledAt])
-}
-
-/// Timeline d'actions d'une campagne : tout événement marquant est journalisé
-/// ici (création d'asset, génération/publication de post, analyse IA, cycle
-/// d'autopilote, alerte…). C'est le fil qui relie une campagne à ses actions.
-model Action {
-  id         String    @id @default(cuid())
-  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  campaignId String?
-  type       String // asset.created | post.generated | post.published | analysis.run | learning.saved | autopilot.run | alert | report.sent
-  actor      String    @default("human") // human | ai | autopilot
-  title      String
-  detail     String? // markdown court
-  status     String    @default("done") // done | pending | failed
-  refType    String? // "post" | "qr" — objet concerné
-  refId      String?
-  createdAt  DateTime  @default(now())
-
-  @@index([campaignId, createdAt])
-  @@index([createdAt])
-}
-
-/// Mémoire de l'IA : leçons durables tirées des données (« les posts angle
-/// astuce convertissent 3× mieux »). L'autopilote les relit AVANT de générer,
-/// ce qui lui permet de s'améliorer au fil des semaines.
-model Learning {
-  id         String    @id @default(cuid())
-  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  campaignId String?
-  insight    String // la leçon, en une phrase actionnable
-  evidence   String? // la donnée qui la fonde
-  weight     Int       @default(1) // importance ; les plus lourdes priment
-  active     Boolean   @default(true)
-  createdAt  DateTime  @default(now())
-
-  @@index([active, weight])
-}
-
-/// Configuration clé/valeur (mode autopilote, plafond budgétaire, e-mail de
-/// rapport…). Éditable dans l'admin, sans redéploiement.
-model Setting {
-  key       String   @id
-  value     String
-  updatedAt DateTime @updatedAt
+  annonces     Annonce[]
 }
 
 /// Un scan = un passage par /r/{slug}. IP anonymisée avant stockage (RGPD).
@@ -145,18 +57,230 @@ model ScanEvent {
   @@index([referrer])
 }
 
-/// Conversion post-installation : l'app mobile appelle /api/convert au premier
-/// lancement (voir README, section « Suivi des conversions »).
+/// Conversion post-scan (installation confirmée par l'app).
 model Conversion {
   id        String   @id @default(cuid())
-  qrCode    QrCode   @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
-  qrCodeId  String
+  qrCode    QrCode?  @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  qrCodeId  String?
+  type      String   @default("install")
+  platform  String? // ios | android | web
+  source    String? // utm_source d'origine
   createdAt DateTime @default(now())
-  platform  String? // ios | android
-  source    String? // utm_source au moment de l'install (attribution post)
 
   @@index([qrCodeId, createdAt])
 }
+
+// ============================================================
+//  CRM TERRAIN — le cœur de l'opération Compiègne
+//  Propriétaire → Annonce → Candidature → Transmission → Installation
+// ============================================================
+
+/// Le contact humain. Un propriétaire peut avoir plusieurs annonces.
+/// Ses coordonnées ne sont JAMAIS exposées publiquement.
+model Proprietaire {
+  id       String  @id @default(cuid())
+  nom      String
+  telephone String?
+  email    String?
+
+  /// coloc_existante | proprietaire_particulier | proprietaire_multi | agence | residence
+  type   String @default("proprietaire_particulier")
+  /// leboncoin | pap | roomlala | facebook | terrain | bouche_a_oreille | entrant_spontane | autre
+  source String @default("terrain")
+  quartier String?
+
+  /// a_contacter | contacte | relance_1 | relance_2 | accord_obtenu | refus | injoignable
+  statut String @default("a_contacter")
+
+  datePremierContact DateTime?
+  dateDerniereAction DateTime?
+  dateRelancePrevue  DateTime?
+
+  accordEcrit  Boolean @default(false)
+  accordPreuve String? // copie du message d'accord
+
+  /// LE champ clé : ce que le propriétaire cherche comme personne, et ce qui
+  /// ne passerait pas. C'est lui qui alimente le score d'affinité.
+  briefRecherche String?
+  notes          String?
+
+  createdAt DateTime   @default(now())
+  annonces  Annonce[]
+  documents Document[]
+
+  @@index([statut])
+  @@index([dateRelancePrevue])
+}
+
+/// Une chambre à pourvoir. Publique (sans aucune donnée propriétaire).
+model Annonce {
+  id             String       @id @default(cuid())
+  proprietaire   Proprietaire @relation(fields: [proprietaireId], references: [id], onDelete: Cascade)
+  proprietaireId String
+
+  titre String
+  slug  String @unique
+
+  /// ID du logement dans l'app Minggle — le pont entre les deux systèmes.
+  referenceExterne String?
+
+  quartier      String?
+  adresseApprox String? // jamais l'adresse exacte en public
+
+  loyer          Int?
+  charges        Int?
+  caution        Int?
+  surfaceChambre Float?
+  surfaceTotale  Float?
+  meublee        Boolean @default(false)
+
+  dateDispo DateTime?
+  dureeMin  String?
+
+  nbColocataires     Int?
+  profilColocataires String? // qui vit déjà là
+  description        String?
+  equipements        String?
+  photos             String? // URLs séparées par des retours à la ligne
+
+  /// brouillon | en_ligne | pourvue | archivee
+  statut      String    @default("brouillon")
+  publishedAt DateTime?
+
+  /// QR/lien tracké dédié à cette annonce (créé automatiquement).
+  qrCode   QrCode? @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  qrCodeId String?
+
+  createdAt     DateTime       @default(now())
+  candidatures  Candidature[]
+  transmissions Transmission[]
+
+  @@index([statut])
+  @@index([proprietaireId])
+}
+
+/// Un candidat qui postule sur une annonce (via le formulaire public).
+model Candidature {
+  id        String  @id @default(cuid())
+  annonce   Annonce @relation(fields: [annonceId], references: [id], onDelete: Cascade)
+  annonceId String
+
+  nom       String
+  email     String
+  telephone String?
+
+  /// etudiant | jeune_actif | alternant | stagiaire | autre
+  statutPro      String  @default("etudiant")
+  ecoleEmployeur String?
+  budgetMax      Int?
+  dateDispo      DateTime?
+  dureeSouhaitee String?
+  /// oui | non | a_verifier
+  garant         String  @default("a_verifier")
+
+  // --- Profil d'affinités : le cœur du produit ---
+  /// couche_tot | couche_tard | flexible
+  rythme  String @default("flexible")
+  /// 1 (peu regardant) → 5 (maniaque)
+  menage  Int    @default(3)
+  /// jamais | parfois | souvent
+  invites String @default("parfois")
+  /// 1 (jamais) → 5 (très festif)
+  fetes   Int    @default(3)
+  fumeur  Boolean @default(false)
+  animaux Boolean @default(false)
+
+  /// « pourquoi cette coloc en particulier » — obligatoire, min 100 caractères
+  motivation String
+
+  /// Score saisi par l'opérateur (1-5) + score suggéré automatiquement
+  scoreAffinite Int?
+  scoreSuggere  Int?
+  scoreRaisons  String? // explications du score suggéré, une par ligne
+
+  /// a_qualifier | qualifie | transmis | installe | ecarte | sans_suite
+  statut String @default("a_qualifier")
+
+  /// Rempli automatiquement depuis le tracking QR (utm_source / QR scanné)
+  campagneSource String?
+
+  notesQualification String?
+
+  createdAt     DateTime       @default(now())
+  transmissions Transmission[]
+  documents     Document[]
+
+  @@index([statut])
+  @@index([annonceId, statut])
+  @@index([createdAt])
+}
+
+/// La traçabilité : une ligne = un envoi d'un candidat à un propriétaire.
+model Transmission {
+  id            String      @id @default(cuid())
+  candidature   Candidature @relation(fields: [candidatureId], references: [id], onDelete: Cascade)
+  candidatureId String
+  annonce       Annonce     @relation(fields: [annonceId], references: [id], onDelete: Cascade)
+  annonceId     String
+
+  /// whatsapp | sms | mail | appel | autre
+  canal String @default("whatsapp")
+
+  /// en_attente | visite_prevue | visite_faite | accepte_installe |
+  /// refuse_par_coloc | refuse_par_candidat | sans_reponse
+  resultat String @default("en_attente")
+
+  dateResultat DateTime?
+  commentaire  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([resultat])
+  @@index([annonceId])
+  @@index([createdAt])
+}
+
+/// Pièces jointes : accord de publication, fiche candidat, dossier locataire.
+model Document {
+  id             String        @id @default(cuid())
+  proprietaire   Proprietaire? @relation(fields: [proprietaireId], references: [id], onDelete: Cascade)
+  proprietaireId String?
+  candidature    Candidature?  @relation(fields: [candidatureId], references: [id], onDelete: Cascade)
+  candidatureId  String?
+
+  /// accord_publication | fiche_candidat | dossier_locataire | autre
+  type       String @default("autre")
+  nomFichier String
+  url        String
+
+  envoyeLe   DateTime?
+  canalEnvoi String?
+
+  createdAt DateTime @default(now())
+
+  @@index([proprietaireId])
+}
+
+/// Journal horodaté : chaque action marquante du CRM (contact, accord,
+/// publication, qualification, transmission, résultat) y est tracée.
+model Action {
+  id        String   @id @default(cuid())
+  type      String // proprietaire.contacte | annonce.publiee | candidature.qualifiee | transmission.envoyee…
+  actor     String   @default("human") // human | system
+  title     String
+  detail    String?
+  status    String   @default("done") // done | pending
+  refType   String? // proprietaire | annonce | candidature | transmission
+  refId     String?
+  createdAt DateTime @default(now())
+
+  @@index([refType, refId])
+  @@index([createdAt])
+}
+
+// ============================================================
+//  E-MAIL — relances propriétaires & communication candidats
+// ============================================================
 
 /// Contact e-mail (inscrit via l'app, importé, ou ajouté à la main).
 model Contact {
@@ -165,7 +289,7 @@ model Contact {
   name           String?
   source         String? // app | import | manuel
   subscribed     Boolean      @default(true)
-  attributes     String? // profil JSON libre issu du CSV : { genre, age, statut, interets, … }
+  attributes     String? // profil JSON libre issu du CSV : { genre, age, statut, … }
   createdAt      DateTime     @default(now())
   unsubscribedAt DateTime?
   events         EmailEvent[]
@@ -177,7 +301,7 @@ model Contact {
 model EmailCampaign {
   id          String       @id @default(cuid())
   subject     String
-  preheader   String? // texte d'aperçu dans la boîte de réception
+  preheader   String?
   content     String // blocs JSON : { intro, sections[{title,body}], ctaLabel, ctaUrl }
   status      String       @default("draft") // draft | sent
   aiGenerated Boolean      @default(false)
@@ -207,4 +331,11 @@ model Segment {
   name      String
   rules     String // JSON : [{ key, op: contient|egal|min|max, value }]
   createdAt DateTime @default(now())
+}
+
+/// Réglages clé/valeur (identité de marque pour les e-mails, etc.).
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
