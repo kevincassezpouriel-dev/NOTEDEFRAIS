@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/admin/candidatures", label: "Candidatures" },
   { href: "/admin/transmissions", label: "Transmissions" },
   { href: "/admin/qrcodes", label: "QR & liens" },
+  { href: "/admin/acquisition", label: "Stats" },
   { href: "/admin/emails", label: "E-mails" },
 ];
 
