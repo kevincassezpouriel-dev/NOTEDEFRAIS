@@ -1,22 +1,27 @@
 import { prisma } from "./prisma";
 
+/** Types d'événements du CRM terrain, journalisés dans le fil d'activité. */
 export type ActionType =
+  | "proprietaire.cree"
+  | "proprietaire.statut"
+  | "proprietaire.relance"
+  | "annonce.creee"
+  | "annonce.publiee"
+  | "annonce.pourvue"
+  | "candidature.recue"
+  | "candidature.qualifiee"
+  | "transmission.envoyee"
+  | "transmission.resultat"
+  | "document.ajoute"
   | "asset.created"
-  | "post.generated"
-  | "post.published"
-  | "post.scheduled"
-  | "post.recycled"
-  | "analysis.run"
-  | "learning.saved"
-  | "autopilot.run"
   | "alert"
   | "report.sent";
 
-export type Actor = "human" | "ai" | "autopilot";
+export type Actor = "human" | "ai" | "system";
 
 /**
  * Journalise une action dans la timeline (globale + par campagne). C'est le
- * fil qui relie une campagne à ce qui a été fait pour elle. Ne lève jamais :
+ * fil qui retrace tout ce qui a été fait sur un dossier. Ne lève jamais :
  * un échec de log ne doit pas casser l'action métier.
  */
 export async function logAction(input: {
