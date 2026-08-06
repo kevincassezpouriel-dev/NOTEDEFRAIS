@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useState } from "react";
+import Documents from "@/components/Documents";
 import {
   CATEGORIES,
   CANDIDATURE_STATUTS,
@@ -410,6 +411,8 @@ export default function FicheContact({ params }: { params: Promise<{ id: string 
               </ol>
             )}
           </div>
+
+          <Documents contactId={c.id} titre="Pièces jointes du dossier" />
 
           <div className="card p-4">
             <h2 className="text-sm font-semibold mb-2">Notes libres</h2>

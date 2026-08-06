@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import Documents from "@/components/Documents";
 import {
   CANAUX,
   CANDIDATURE_STATUTS,
@@ -309,6 +310,8 @@ export default function CandidaturesPage() {
               </span>
             </div>
           </div>
+
+          <Documents candidatureId={c.id} titre="Dossier du candidat" />
         </>
       )}
     </div>
