@@ -233,7 +233,7 @@ export async function importContacts(raw: string, source = "import"): Promise<nu
       keys.forEach((k, i) => {
         if (i !== emailCol && cells[i]) attributes[k] = cells[i];
       });
-      await prisma.contact.upsert({
+      await prisma.abonne.upsert({
         where: { email },
         create: { email, source, attributes: JSON.stringify(attributes) },
         update: { attributes: JSON.stringify(attributes) },
@@ -247,7 +247,7 @@ export async function importContacts(raw: string, source = "import"): Promise<nu
     new Set((raw.match(new RegExp(EMAIL_RE.source, "g")) ?? []).map((e) => e.toLowerCase()))
   ).slice(0, 10000);
   for (const email of emails) {
-    await prisma.contact.upsert({ where: { email }, create: { email, source }, update: {} });
+    await prisma.abonne.upsert({ where: { email }, create: { email, source }, update: {} });
     done++;
   }
   return done;
@@ -285,7 +285,7 @@ export function contactMatches(attributesJson: string | null, rules: SegmentRule
 
 /** Contacts abonnés d'une liste ciblée (segmentId absent = liste complète). */
 export async function segmentContacts(segmentId?: string | null) {
-  const contacts = await prisma.contact.findMany({ where: { subscribed: true } });
+  const contacts = await prisma.abonne.findMany({ where: { subscribed: true } });
   if (!segmentId) return contacts;
   const segment = await prisma.segment.findUnique({ where: { id: segmentId } });
   if (!segment) return contacts;

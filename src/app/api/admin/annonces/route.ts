@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   if (!titre || !proprietaireId) {
     return NextResponse.json({ error: "Titre et propriétaire obligatoires" }, { status: 400 });
   }
-  const proprietaire = await prisma.proprietaire.findUnique({ where: { id: proprietaireId } });
+  const proprietaire = await prisma.contact.findUnique({ where: { id: proprietaireId } });
   if (!proprietaire) return NextResponse.json({ error: "Propriétaire introuvable" }, { status: 404 });
 
   const slug = await uniqueSlug(titre);

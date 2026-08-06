@@ -54,9 +54,9 @@ export default function EmailsPage() {
 
   const load = useCallback(async () => {
     const [cRes, eRes, sRes] = await Promise.all([
-      fetch("/api/admin/contacts", { cache: "no-store" }),
+      fetch("/api/admin/emails/abonnes", { cache: "no-store" }),
       fetch("/api/admin/emails", { cache: "no-store" }),
-      fetch("/api/admin/segments", { cache: "no-store" }),
+      fetch("/api/admin/emails/segments", { cache: "no-store" }),
     ]);
     if (cRes.ok) setContacts(await cRes.json());
     if (eRes.ok) setCampaigns(await eRes.json());
@@ -74,7 +74,7 @@ export default function EmailsPage() {
   async function importList() {
     setBusy("import");
     setMessage(null);
-    const res = await fetch("/api/admin/contacts", {
+    const res = await fetch("/api/admin/emails/abonnes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ raw }),
@@ -98,7 +98,7 @@ export default function EmailsPage() {
       return;
     }
     setBusy("segment");
-    const res = await fetch("/api/admin/segments", {
+    const res = await fetch("/api/admin/emails/segments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: segName, rules: clean }),
@@ -272,7 +272,7 @@ export default function EmailsPage() {
                 style={{ background: "var(--grid)" }}>
                 <strong>{s.name}</strong> · {s.count} contact(s)
                 <button aria-label="Supprimer" style={{ color: "var(--text-muted)" }}
-                  onClick={async () => { await fetch(`/api/admin/segments/${s.id}`, { method: "DELETE" }); load(); }}>
+                  onClick={async () => { await fetch(`/api/admin/emails/segments/${s.id}`, { method: "DELETE" }); load(); }}>
                   ×
                 </button>
               </span>

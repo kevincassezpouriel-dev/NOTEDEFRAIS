@@ -75,15 +75,23 @@ model Conversion {
 //  Propriétaire → Annonce → Candidature → Transmission → Installation
 // ============================================================
 
-/// Le contact humain. Un propriétaire peut avoir plusieurs annonces.
+/// LE contact du CRM — quel que soit son rôle : propriétaire, coloc en place,
+/// partenaire (école, commerce, association), prescripteur, agence, autre.
+/// Un contact de catégorie « proprietaire » peut porter plusieurs annonces.
 /// Ses coordonnées ne sont JAMAIS exposées publiquement.
-model Proprietaire {
-  id       String  @id @default(cuid())
-  nom      String
+model Contact {
+  id        String  @id @default(cuid())
+  nom       String
   telephone String?
-  email    String?
+  email     String?
+  /// Structure rattachée : nom de l'école, du commerce, de l'agence…
+  organisation String?
 
-  /// coloc_existante | proprietaire_particulier | proprietaire_multi | agence | residence
+  /// LA classification maîtresse du CRM :
+  /// proprietaire | partenaire | prescripteur | agence | locataire | fournisseur | autre
+  categorie String @default("proprietaire")
+
+  /// Sous-type, dépend de la catégorie (coloc_existante, ecole, commerce…)
   type   String @default("proprietaire_particulier")
   /// leboncoin | pap | roomlala | facebook | terrain | bouche_a_oreille | entrant_spontane | autre
   source String @default("terrain")
@@ -104,18 +112,62 @@ model Proprietaire {
   briefRecherche String?
   notes          String?
 
-  createdAt DateTime   @default(now())
-  annonces  Annonce[]
-  documents Document[]
+  /// Étiquettes libres, séparées par des virgules (« campus », « centre-ville »…)
+  tags String?
 
+  createdAt    DateTime      @default(now())
+  annonces     Annonce[]
+  documents    Document[]
+  interactions Interaction[]
+  taches       Tache[]
+
+  @@index([categorie, statut])
   @@index([statut])
   @@index([dateRelancePrevue])
+}
+
+/// Chaque échange avec un contact : appel, message, e-mail, rendez-vous,
+/// visite. C'est l'historique qui permet de reprendre un dossier froid.
+model Interaction {
+  id        String  @id @default(cuid())
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId String
+
+  /// appel | message | email | rdv | visite | autre
+  type String @default("appel")
+  /// entrant | sortant
+  sens String @default("sortant")
+  /// Ce qui s'est dit, en clair.
+  resume String
+
+  createdAt DateTime @default(now())
+
+  @@index([contactId, createdAt])
+}
+
+/// Une chose à faire, datée. Alimente « mes relances du jour ».
+model Tache {
+  id        String   @id @default(cuid())
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId String?
+
+  titre    String
+  dueAt    DateTime?
+  /// basse | normale | haute
+  priorite String    @default("normale")
+  done     Boolean   @default(false)
+  doneAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([done, dueAt])
+  @@index([contactId])
 }
 
 /// Une chambre à pourvoir. Publique (sans aucune donnée propriétaire).
 model Annonce {
   id             String       @id @default(cuid())
-  proprietaire   Proprietaire @relation(fields: [proprietaireId], references: [id], onDelete: Cascade)
+  proprietaire   Contact @relation(fields: [proprietaireId], references: [id], onDelete: Cascade)
   proprietaireId String
 
   titre String
@@ -243,7 +295,7 @@ model Transmission {
 /// Pièces jointes : accord de publication, fiche candidat, dossier locataire.
 model Document {
   id             String        @id @default(cuid())
-  proprietaire   Proprietaire? @relation(fields: [proprietaireId], references: [id], onDelete: Cascade)
+  proprietaire   Contact?     @relation(fields: [proprietaireId], references: [id], onDelete: Cascade)
   proprietaireId String?
   candidature    Candidature?  @relation(fields: [candidatureId], references: [id], onDelete: Cascade)
   candidatureId  String?
@@ -282,8 +334,8 @@ model Action {
 //  E-MAIL — relances propriétaires & communication candidats
 // ============================================================
 
-/// Contact e-mail (inscrit via l'app, importé, ou ajouté à la main).
-model Contact {
+/// Abonné de la liste e-mail (inscrit via l'app, importé, ou ajouté à la main).
+model Abonne {
   id             String       @id @default(cuid())
   email          String       @unique
   name           String?
@@ -316,7 +368,7 @@ model EmailEvent {
   id         String        @id @default(cuid())
   campaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId String
-  contact    Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  abonne     Abonne        @relation(fields: [contactId], references: [id], onDelete: Cascade)
   contactId  String
   type       String // open | click
   createdAt  DateTime      @default(now())

@@ -9,7 +9,7 @@ type P = { params: Promise<{ id: string }> };
  *  reçues sur ses annonces, ses transmissions, ses documents, son journal. */
 export async function GET(_req: NextRequest, { params }: P) {
   const { id } = await params;
-  const proprietaire = await prisma.proprietaire.findUnique({
+  const contact = await prisma.contact.findUnique({
     where: { id },
     include: {
       annonces: {
@@ -23,21 +23,23 @@ export async function GET(_req: NextRequest, { params }: P) {
         },
       },
       documents: { orderBy: { createdAt: "desc" } },
+      interactions: { orderBy: { createdAt: "desc" }, take: 100 },
+      taches: { orderBy: [{ done: "asc" }, { dueAt: "asc" }] },
     },
   });
-  if (!proprietaire) return NextResponse.json({ error: "Introuvable" }, { status: 404 });
+  if (!contact) return NextResponse.json({ error: "Introuvable" }, { status: 404 });
 
   const journal = await prisma.action.findMany({
     where: {
       OR: [
-        { refType: "proprietaire", refId: id },
-        { refType: "annonce", refId: { in: proprietaire.annonces.map((a) => a.id) } },
+        { refType: "contact", refId: id },
+        { refType: "annonce", refId: { in: contact.annonces.map((a: { id: string }) => a.id) } },
       ],
     },
     orderBy: { createdAt: "desc" },
     take: 50,
   });
-  return NextResponse.json({ ...proprietaire, journal });
+  return NextResponse.json({ ...contact, journal });
 }
 
 export async function PATCH(req: NextRequest, { params }: P) {
@@ -47,9 +49,9 @@ export async function PATCH(req: NextRequest, { params }: P) {
   const date = (k: string) =>
     body[k] !== undefined ? { [k]: body[k] ? new Date(body[k] as string) : null } : {};
 
-  const before = await prisma.proprietaire.findUnique({ where: { id }, select: { statut: true } });
+  const before = await prisma.contact.findUnique({ where: { id }, select: { statut: true } });
   try {
-    const proprietaire = await prisma.proprietaire.update({
+    const contact = await prisma.contact.update({
       where: { id },
       data: {
         ...(body.nom !== undefined ? { nom: String(body.nom).trim() } : {}),
@@ -60,6 +62,9 @@ export async function PATCH(req: NextRequest, { params }: P) {
         ...str("notes"),
         ...str("accordPreuve"),
         ...(body.type !== undefined ? { type: String(body.type) } : {}),
+        ...(body.categorie !== undefined ? { categorie: String(body.categorie) } : {}),
+        ...str("organisation"),
+        ...str("tags"),
         ...(body.source !== undefined ? { source: String(body.source) } : {}),
         ...(body.statut !== undefined ? { statut: String(body.statut) } : {}),
         ...(body.accordEcrit !== undefined ? { accordEcrit: Boolean(body.accordEcrit) } : {}),
@@ -68,15 +73,15 @@ export async function PATCH(req: NextRequest, { params }: P) {
         dateDerniereAction: new Date(),
       },
     });
-    if (body.statut !== undefined && before && before.statut !== proprietaire.statut) {
+    if (body.statut !== undefined && before && before.statut !== contact.statut) {
       await logAction({
-        type: "proprietaire.statut",
-        title: `${proprietaire.nom} → ${proprietaire.statut.replace(/_/g, " ")}`,
-        refType: "proprietaire",
+        type: "contact.statut",
+        title: `${contact.nom} → ${contact.statut.replace(/_/g, " ")}`,
+        refType: "contact",
         refId: id,
       });
     }
-    return NextResponse.json(proprietaire);
+    return NextResponse.json(contact);
   } catch {
     return NextResponse.json({ error: "Introuvable" }, { status: 404 });
   }
@@ -85,7 +90,7 @@ export async function PATCH(req: NextRequest, { params }: P) {
 export async function DELETE(_req: NextRequest, { params }: P) {
   const { id } = await params;
   try {
-    await prisma.proprietaire.delete({ where: { id } });
+    await prisma.contact.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Introuvable" }, { status: 404 });

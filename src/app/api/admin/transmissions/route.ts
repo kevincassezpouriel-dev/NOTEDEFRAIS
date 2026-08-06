@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     },
   });
   await prisma.candidature.update({ where: { id: candidatureId }, data: { statut: "transmis" } });
-  await prisma.proprietaire.update({
+  await prisma.contact.update({
     where: { id: candidature.annonce.proprietaireId },
     data: { dateDerniereAction: new Date() },
   });

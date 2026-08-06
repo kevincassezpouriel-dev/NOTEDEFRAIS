@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ uid: string }> }
 ) {
   const { uid } = await params;
-  await prisma.contact
+  await prisma.abonne
     .update({ where: { id: uid }, data: { subscribed: false, unsubscribedAt: new Date() } })
     .catch(() => null);
   const brand = await getBrand();

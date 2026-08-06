@@ -2,9 +2,12 @@ import { prisma } from "./prisma";
 
 /** Types d'événements du CRM terrain, journalisés dans le fil d'activité. */
 export type ActionType =
-  | "proprietaire.cree"
-  | "proprietaire.statut"
-  | "proprietaire.relance"
+  | "contact.cree"
+  | "contact.statut"
+  | "contact.relance"
+  | "interaction.ajoutee"
+  | "tache.creee"
+  | "tache.faite"
   | "annonce.creee"
   | "annonce.publiee"
   | "annonce.pourvue"
@@ -30,7 +33,7 @@ export async function logAction(input: {
   actor?: Actor;
   detail?: string | null;
   status?: "done" | "pending" | "failed";
-  refType?: "proprietaire" | "annonce" | "candidature" | "transmission" | "qr" | "email" | null;
+  refType?: "contact" | "annonce" | "candidature" | "transmission" | "qr" | "email" | null;
   refId?: string | null;
 }): Promise<void> {
   try {

@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   if (!email || !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) {
     return NextResponse.json({ error: "E-mail invalide" }, { status: 400 });
   }
-  await prisma.contact.upsert({
+  await prisma.abonne.upsert({
     where: { email },
     create: { email, name: body.name?.slice(0, 80) ?? null, source: "app" },
     update: { subscribed: true, unsubscribedAt: null },

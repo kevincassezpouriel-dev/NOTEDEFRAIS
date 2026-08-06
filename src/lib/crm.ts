@@ -10,6 +10,76 @@
 
 /* ---------------- Vocabulaire ---------------- */
 
+/** La classification maîtresse : tout le CRM se lit à travers elle. */
+export const CATEGORIES = [
+  { value: "proprietaire", label: "Propriétaire", emoji: "🏠" },
+  { value: "partenaire", label: "Partenaire", emoji: "🤝" },
+  { value: "prescripteur", label: "Prescripteur", emoji: "📣" },
+  { value: "agence", label: "Agence", emoji: "🏢" },
+  { value: "locataire", label: "Locataire", emoji: "🔑" },
+  { value: "fournisseur", label: "Fournisseur", emoji: "🧰" },
+  { value: "autre", label: "Autre", emoji: "•" },
+] as const;
+
+/** Sous-types proposés selon la catégorie choisie. */
+export const TYPES_PAR_CATEGORIE: Record<string, { value: string; label: string }[]> = {
+  proprietaire: [
+    { value: "coloc_existante", label: "Coloc existante" },
+    { value: "proprietaire_particulier", label: "Propriétaire particulier" },
+    { value: "proprietaire_multi", label: "Propriétaire multi-biens" },
+    { value: "residence", label: "Résidence" },
+  ],
+  partenaire: [
+    { value: "ecole", label: "École / campus" },
+    { value: "commerce", label: "Commerce" },
+    { value: "association", label: "Association" },
+    { value: "collectivite", label: "Collectivité" },
+    { value: "entreprise", label: "Entreprise" },
+  ],
+  prescripteur: [
+    { value: "etudiant_ambassadeur", label: "Étudiant ambassadeur" },
+    { value: "influenceur", label: "Créateur / influenceur" },
+    { value: "reseau_perso", label: "Réseau personnel" },
+  ],
+  agence: [
+    { value: "agence_immo", label: "Agence immobilière" },
+    { value: "gestion_locative", label: "Gestion locative" },
+  ],
+  locataire: [
+    { value: "locataire_place", label: "Locataire en place" },
+    { value: "ancien_candidat", label: "Ancien candidat" },
+  ],
+  fournisseur: [
+    { value: "imprimeur", label: "Imprimeur" },
+    { value: "prestataire", label: "Prestataire" },
+  ],
+  autre: [{ value: "autre", label: "Autre" }],
+};
+
+export function typesPour(categorie: string) {
+  return TYPES_PAR_CATEGORIE[categorie] ?? TYPES_PAR_CATEGORIE.autre;
+}
+
+export const INTERACTION_TYPES = [
+  { value: "appel", label: "Appel", emoji: "📞" },
+  { value: "message", label: "Message", emoji: "💬" },
+  { value: "email", label: "E-mail", emoji: "✉️" },
+  { value: "rdv", label: "Rendez-vous", emoji: "🗓️" },
+  { value: "visite", label: "Visite", emoji: "🚪" },
+  { value: "autre", label: "Autre", emoji: "•" },
+] as const;
+
+export const SENS = [
+  { value: "sortant", label: "Sortant" },
+  { value: "entrant", label: "Entrant" },
+] as const;
+
+export const PRIORITES = [
+  { value: "basse", label: "Basse", color: "var(--text-muted)" },
+  { value: "normale", label: "Normale", color: "var(--series-1)" },
+  { value: "haute", label: "Haute", color: "var(--critical)" },
+] as const;
+
 export const PROPRIETAIRE_TYPES = [
   { value: "coloc_existante", label: "Coloc existante" },
   { value: "proprietaire_particulier", label: "Propriétaire particulier" },

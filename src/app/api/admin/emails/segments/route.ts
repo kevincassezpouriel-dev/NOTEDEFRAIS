@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const [segments, contacts] = await Promise.all([
     prisma.segment.findMany({ orderBy: { createdAt: "desc" } }),
-    prisma.contact.findMany({
+    prisma.abonne.findMany({
       where: { subscribed: true },
       select: { attributes: true },
     }),
