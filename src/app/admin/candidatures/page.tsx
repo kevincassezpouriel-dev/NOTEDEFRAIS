@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import AjouterCandidat from "@/components/AjouterCandidat";
 import Documents from "@/components/Documents";
 import {
   CANAUX,
@@ -36,6 +37,7 @@ interface Candidature {
   scoreRaisons: string | null;
   statut: string;
   campagneSource: string | null;
+  origine: string;
   notesQualification: string | null;
   createdAt: string;
   annonce: {
@@ -176,6 +178,7 @@ export default function CandidaturesPage() {
         <span className="text-sm tabular-nums" style={{ color: "var(--text-muted)" }}>
           {items.length === 0 ? "0" : `${i + 1} / ${items.length}`}
         </span>
+        <AjouterCandidat annonceIdParDefaut={annonceId || undefined} onAjoute={load} />
       </div>
 
       {msg && <p className="text-sm" style={{ color: msg.error ? "var(--critical)" : "var(--good)" }}>{msg.text}</p>}
@@ -208,6 +211,12 @@ export default function CandidaturesPage() {
                 <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                   reçu le {new Date(c.createdAt).toLocaleDateString("fr-FR")}
                   {c.campagneSource && ` · via ${c.campagneSource}`}
+                  {c.origine === "manuel" && (
+                    <span className="ml-1.5 px-1.5 py-0.5 rounded-full"
+                      style={{ background: "var(--grid)", color: "var(--text-secondary)" }}>
+                      saisie manuelle
+                    </span>
+                  )}
                 </span>
               </div>
               <p className="text-sm" style={{ color: "var(--text-secondary)" }}>

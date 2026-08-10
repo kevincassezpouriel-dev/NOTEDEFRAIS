@@ -176,6 +176,10 @@ model Annonce {
   /// ID du logement dans l'app Minggle — le pont entre les deux systèmes.
   referenceExterne String?
 
+  /// Lien vers l'annonce d'origine (Leboncoin, PAP, Facebook…) : d'où vient
+  /// le bien, pour retrouver la source et vérifier qu'elle est toujours active.
+  urlOrigine String?
+
   quartier      String?
   adresseApprox String? // jamais l'adresse exacte en public
 
@@ -255,6 +259,9 @@ model Candidature {
 
   /// Rempli automatiquement depuis le tracking QR (utm_source / QR scanné)
   campagneSource String?
+
+  /// formulaire | manuel — un candidat rencontré au téléphone est saisi à la main
+  origine String @default("formulaire")
 
   notesQualification String?
 

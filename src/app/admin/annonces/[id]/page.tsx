@@ -11,6 +11,7 @@ interface Annonce {
   slug: string;
   statut: string;
   referenceExterne: string | null;
+  urlOrigine: string | null;
   quartier: string | null;
   adresseApprox: string | null;
   loyer: number | null;
@@ -141,6 +142,23 @@ export default function FicheAnnonce({ params }: { params: Promise<{ id: string 
             <div className="flex flex-wrap gap-3">
               {champ("Adresse approximative (publique)", "adresseApprox")}
               {champ("Référence logement (app Minggle)", "referenceExterne")}
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">
+                Annonce d&apos;origine (Leboncoin, PAP, Facebook…)
+              </label>
+              <div className="flex gap-2">
+                <input type="url" className="input flex-1" placeholder="https://www.leboncoin.fr/…"
+                  defaultValue={a.urlOrigine ?? ""}
+                  onBlur={(e) => patch({ urlOrigine: e.target.value || null })} />
+                {a.urlOrigine && (
+                  <a href={a.urlOrigine} target="_blank" rel="noopener"
+                    className="btn btn-secondary whitespace-nowrap">Ouvrir ↗</a>
+                )}
+              </div>
+              <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                D&apos;où vient le bien — pratique pour vérifier qu&apos;il est toujours disponible.
+              </p>
             </div>
             {(["description", "profilColocataires", "equipements", "photos"] as const).map((k) => (
               <div key={k}>

@@ -38,6 +38,7 @@ export async function PATCH(req: NextRequest, { params }: P) {
       data: {
         ...(body.titre !== undefined ? { titre: String(body.titre).trim() } : {}),
         ...str("referenceExterne"),
+        ...str("urlOrigine"),
         ...str("quartier"),
         ...str("adresseApprox"),
         ...str("dureeMin"),

@@ -13,6 +13,7 @@ interface AnnonceRow {
   charges: number | null;
   quartier: string | null;
   referenceExterne: string | null;
+  urlOrigine: string | null;
   createdAt: string;
   proprietaire: { id: string; nom: string };
   qrCode: { id: string; slug: string } | null;
@@ -42,6 +43,7 @@ export default function AnnoncesPage() {
     nbColocataires: "",
     dateDispo: "",
     referenceExterne: "",
+    urlOrigine: "",
     description: "",
   });
 
@@ -148,6 +150,14 @@ export default function AnnoncesPage() {
                 value={form.referenceExterne}
                 onChange={(e) => setForm({ ...form, referenceExterne: e.target.value })} />
             </div>
+            <div className="flex-[2] min-w-56">
+              <label className="block text-xs font-medium mb-1">
+                Annonce d&apos;origine (Leboncoin, PAP, Facebook…)
+              </label>
+              <input className="input" type="url" placeholder="https://www.leboncoin.fr/…"
+                value={form.urlOrigine}
+                onChange={(e) => setForm({ ...form, urlOrigine: e.target.value })} />
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium mb-1">Description</label>
@@ -185,6 +195,15 @@ export default function AnnoncesPage() {
                     <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
                       {a.quartier ?? "—"}
                       {a.referenceExterne && ` · réf. ${a.referenceExterne}`}
+                      {a.urlOrigine && (
+                        <>
+                          {" · "}
+                          <a href={a.urlOrigine} target="_blank" rel="noopener" className="underline"
+                            onClick={(e) => e.stopPropagation()}>
+                            annonce d&apos;origine ↗
+                          </a>
+                        </>
+                      )}
                     </span>
                   </td>
                   <td className="py-2.5 pr-3 text-xs">

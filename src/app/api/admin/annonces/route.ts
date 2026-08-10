@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
       slug,
       qrCodeId: qrCode.id,
       referenceExterne: (body.referenceExterne as string)?.trim() || null,
+      urlOrigine: (body.urlOrigine as string)?.trim() || null,
       quartier: (body.quartier as string)?.trim() || proprietaire.quartier,
       adresseApprox: (body.adresseApprox as string)?.trim() || null,
       loyer: num("loyer"),
