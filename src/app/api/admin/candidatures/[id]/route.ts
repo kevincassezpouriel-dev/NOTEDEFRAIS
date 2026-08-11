@@ -20,7 +20,11 @@ export async function GET(_req: NextRequest, { params }: P) {
   return NextResponse.json(candidature);
 }
 
-/** Qualification : score, statut, notes. Recalcule le score suggéré. */
+/**
+ * Qualification (score, statut, notes) et correction du profil : après un appel
+ * on rattrape souvent un numéro mal noté ou un budget qui a bougé. Le score
+ * suggéré est recalculé sur les valeurs corrigées, pas sur les anciennes.
+ */
 export async function PATCH(req: NextRequest, { params }: P) {
   const { id } = await params;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -31,11 +35,59 @@ export async function PATCH(req: NextRequest, { params }: P) {
   });
   if (!current) return NextResponse.json({ error: "Introuvable" }, { status: 404 });
 
-  const suggestion = suggestScore(current, current.annonce, current.annonce.proprietaire.briefRecherche);
+  const texte = (k: string) => (body[k] !== undefined ? { [k]: String(body[k]).trim() || null } : {});
+  const entier = (k: string) => {
+    if (body[k] === undefined) return {};
+    const n = Number(body[k]);
+    return { [k]: body[k] === null || body[k] === "" || Number.isNaN(n) ? null : n };
+  };
+  const jauge = (k: string) => {
+    if (body[k] === undefined) return {};
+    return { [k]: Math.min(5, Math.max(1, Number(body[k]) || 3)) };
+  };
+
+  const identite = {
+    ...(body.nom !== undefined && String(body.nom).trim()
+      ? { nom: String(body.nom).trim() }
+      : {}),
+    ...(body.email !== undefined && String(body.email).trim()
+      ? { email: String(body.email).trim() }
+      : {}),
+    ...texte("telephone"),
+    ...texte("ecoleEmployeur"),
+    ...texte("dureeSouhaitee"),
+    ...(body.motivation !== undefined && String(body.motivation).trim()
+      ? { motivation: String(body.motivation).trim() }
+      : {}),
+  };
+
+  const profil = {
+    ...(body.statutPro !== undefined ? { statutPro: String(body.statutPro) } : {}),
+    ...(body.garant !== undefined ? { garant: String(body.garant) } : {}),
+    ...(body.rythme !== undefined ? { rythme: String(body.rythme) } : {}),
+    ...(body.invites !== undefined ? { invites: String(body.invites) } : {}),
+    ...jauge("menage"),
+    ...jauge("fetes"),
+    ...entier("budgetMax"),
+    ...(body.fumeur !== undefined ? { fumeur: Boolean(body.fumeur) } : {}),
+    ...(body.animaux !== undefined ? { animaux: Boolean(body.animaux) } : {}),
+    ...(body.dateDispo !== undefined
+      ? { dateDispo: body.dateDispo ? new Date(String(body.dateDispo)) : null }
+      : {}),
+  };
+
+  // Le score se juge sur le profil tel qu'il sera après la mise à jour.
+  const suggestion = suggestScore(
+    { ...current, ...identite, ...profil },
+    current.annonce,
+    current.annonce.proprietaire.briefRecherche
+  );
 
   const candidature = await prisma.candidature.update({
     where: { id },
     data: {
+      ...identite,
+      ...profil,
       ...(body.scoreAffinite !== undefined
         ? { scoreAffinite: body.scoreAffinite === null ? null : Number(body.scoreAffinite) }
         : {}),
@@ -43,7 +95,6 @@ export async function PATCH(req: NextRequest, { params }: P) {
       ...(body.notesQualification !== undefined
         ? { notesQualification: (body.notesQualification as string)?.trim() || null }
         : {}),
-      ...(body.garant !== undefined ? { garant: String(body.garant) } : {}),
       scoreSuggere: suggestion.score,
       scoreRaisons: suggestion.raisons.join("\n"),
     },

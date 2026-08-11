@@ -82,6 +82,7 @@ export default function FicheContact({ params }: { params: Promise<{ id: string 
   const router = useRouter();
   const [c, setC] = useState<Fiche | null>(null);
   const [reveal, setReveal] = useState(false);
+  const [edition, setEdition] = useState(false);
   const [msg, setMsg] = useState<{ text: string; error: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [inter, setInter] = useState({ type: "appel", sens: "sortant", resume: "", relance: "" });
@@ -181,22 +182,79 @@ export default function FicheContact({ params }: { params: Promise<{ id: string 
         {/* ---- Colonne gauche : identité & pilotage ---- */}
         <div className="space-y-4">
           <div className="card p-4 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">Coordonnées</h2>
-              <button className="text-xs underline" style={{ color: "var(--text-muted)" }}
-                onClick={() => setReveal((r) => !r)}>
-                {reveal ? "Masquer" : "Révéler"}
-              </button>
+              <div className="flex items-center gap-3">
+                {!edition && (
+                  <button className="text-xs underline" style={{ color: "var(--text-muted)" }}
+                    onClick={() => setReveal((r) => !r)}>
+                    {reveal ? "Masquer" : "Révéler"}
+                  </button>
+                )}
+                <button className="text-xs underline"
+                  style={{ color: edition ? "var(--accent)" : "var(--text-muted)" }}
+                  onClick={() => { setEdition((v) => !v); setReveal(true); }}>
+                  {edition ? "Terminé" : "Modifier"}
+                </button>
+              </div>
             </div>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               Jamais exposées publiquement ni transmises aux candidats.
             </p>
-            <div className="space-y-1.5 text-sm">
-              <p>📞 {masque(c.telephone)}</p>
-              <p>✉️ {masque(c.email)}</p>
-              {c.organisation && <p>🏢 {c.organisation}</p>}
-              {c.quartier && <p>📍 {c.quartier}</p>}
-            </div>
+
+            {edition ? (
+              <div className="space-y-2">
+                {([
+                  ["nom", "Nom", "text", "Prénom Nom"],
+                  ["telephone", "Téléphone", "tel", "06 12 34 56 78"],
+                  ["email", "E-mail", "email", "nom@exemple.fr"],
+                  ["organisation", "Organisation", "text", "Agence, société…"],
+                  ["quartier", "Quartier / secteur", "text", "Centre-ville"],
+                  ["tags", "Tags (séparés par des virgules)", "text", "réactif, 2 biens"],
+                ] as const).map(([key, label, type, placeholder]) => (
+                  <div key={key}>
+                    <label className="block text-xs font-medium mb-1">{label}</label>
+                    <input
+                      key={`${key}-${c[key] ?? ""}`}
+                      type={type}
+                      className="input"
+                      placeholder={placeholder}
+                      defaultValue={c[key] ?? ""}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        if (v === (c[key] ?? "")) return;
+                        if (key === "nom" && !v) {
+                          setMsg({ text: "Le nom ne peut pas être vide", error: true });
+                          e.target.value = c.nom;
+                          return;
+                        }
+                        patch({ [key]: v });
+                      }}
+                    />
+                  </div>
+                ))}
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Chaque champ s&apos;enregistre quand tu en sors.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1.5 text-sm">
+                <p>📞 {masque(c.telephone)}</p>
+                <p>✉️ {masque(c.email)}</p>
+                {c.organisation && <p>🏢 {c.organisation}</p>}
+                {c.quartier && <p>📍 {c.quartier}</p>}
+                {c.tags && (
+                  <p className="flex flex-wrap gap-1 pt-1">
+                    {c.tags.split(",").map((t) => t.trim()).filter(Boolean).map((t) => (
+                      <span key={t} className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--grid)" }}>
+                        {t}
+                      </span>
+                    ))}
+                  </p>
+                )}
+              </div>
+            )}
+
             {reveal && c.telephone && (
               <div className="flex gap-2 pt-1">
                 <a className="btn btn-secondary !py-1 text-xs" href={`tel:${c.telephone}`}>Appeler</a>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import AjouterCandidat from "@/components/AjouterCandidat";
 import Documents from "@/components/Documents";
+import ModifierCandidat from "@/components/ModifierCandidat";
 import {
   CANAUX,
   CANDIDATURE_STATUTS,
@@ -245,9 +246,20 @@ export default function CandidaturesPage() {
                   {c.motivation}
                 </p>
               </div>
-              <div className="flex gap-3 text-xs pt-1" style={{ color: "var(--text-muted)" }}>
+              <div className="flex items-center gap-3 text-xs pt-1 flex-wrap" style={{ color: "var(--text-muted)" }}>
                 <a href={`mailto:${c.email}`} className="underline">{c.email}</a>
                 {c.telephone && <a href={`tel:${c.telephone}`} className="underline">{c.telephone}</a>}
+                {c.telephone && (
+                  <a href={`https://wa.me/${c.telephone.replace(/[^0-9]/g, "")}`} target="_blank"
+                    rel="noopener" className="underline">WhatsApp</a>
+                )}
+              </div>
+              <div className="pt-1">
+                <ModifierCandidat
+                  key={c.id}
+                  candidature={c}
+                  onEnregistrer={(data) => patch(data, "✓ Profil corrigé")}
+                />
               </div>
             </div>
           </div>
